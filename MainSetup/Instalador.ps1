@@ -191,7 +191,7 @@ function InstalarSoporteFabricante {
     }
 
     if ($fab -eq "Desconocido" -or !$urls.ContainsKey($fab)) {
-        Write-Warning "Fabricante no reconocido. Se usará SDI Lite como solución de respaldo." "WARNING"
+        Write-Warning "Fabricante no reconocido. Se usará SDI Lite como solucion de respaldo." "WARNING"
         UsarSDILite
         return
     }
@@ -519,7 +519,7 @@ function DescargarFondosYProtectorDePantalla {
                 Write-Log "PASO 3: Descargando $($fondo.nombre)..." "INFO"
                 Invoke-WebRequest -Uri $fondo.url -OutFile $destino -UseBasicParsing -ErrorAction Stop
 
-                # Validación (mínimo 20 KB)
+                # Validacion (mínimo 20 KB)
                 if (-not (Test-Path $destino) -or (Get-Item $destino).Length -lt 20480) {
                     throw "Archivo incompleto o demasiado pequeño: $destino"
                 }
@@ -540,7 +540,7 @@ function DescargarFondosYProtectorDePantalla {
                 Start-BitsTransfer -Source $videoUrl -Destination $videoDestino -ErrorAction Stop
             }
             catch {
-                Write-Warning "PASO 4.1: BITS falló, probando con Invoke-WebRequest. $_"
+                Write-Warning "PASO 4.1: BITS fallo, probando con Invoke-WebRequest. $_"
                 try {
                     Invoke-WebRequest -Uri $videoUrl -OutFile $videoDestino -UseBasicParsing -ErrorAction Stop
                 }
@@ -549,7 +549,7 @@ function DescargarFondosYProtectorDePantalla {
                 }
             }
 
-            # Validación (mínimo 1 MB)
+            # Validacion (mínimo 1 MB)
             if (-not (Test-Path $videoDestino) -or (Get-Item $videoDestino).Length -lt 1048576) {
                 Write-Warning "FALLO PASO 4.3: Video ausente o demasiado pequeño: $videoDestino"
             }
@@ -561,7 +561,7 @@ function DescargarFondosYProtectorDePantalla {
         # ================= PASO 5: Descargar e instalar Lively.scr =================
         $zipOk = $false
         if (Test-Path $destinoScr) {
-            Write-Log "PASO 5: $scrName ya existe en $destinoScr. Omitiendo instalación." "INFO"
+            Write-Log "PASO 5: $scrName ya existe en $destinoScr. Omitiendo instalacion." "INFO"
         }
         else {
             # URLs
@@ -570,7 +570,7 @@ function DescargarFondosYProtectorDePantalla {
             $minZipBytes = 4096   # ~4 KB (el plugin es < 8 KB)
             $minScrBytes = 4096   # ~4 KB (el .scr es pequeño por diseño)
 
-            # 5.1 Descargar ZIP (con limpieza, reintentos y validación)
+            # 5.1 Descargar ZIP (con limpieza, reintentos y validacion)
             try {
                 $maxTries = 3
                 $minZipBytes = 4096   # ~4 KB: el ZIP puede ser muy pequeño en esta release
@@ -585,11 +585,11 @@ function DescargarFondosYProtectorDePantalla {
                         Start-BitsTransfer -Source $zipUrl -Destination $zipPath -ErrorAction Stop
                     }
                     catch {
-                        Write-Warning ("PASO 5.1.{0}: BITS falló, usando Invoke-WebRequest. {1}" -f $i, $_)
+                        Write-Warning ("PASO 5.1.{0}: BITS fallo, usando Invoke-WebRequest. {1}" -f $i, $_)
                         Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing -ErrorAction Stop
                     }
 
-                    # Validación de tamaño (sin operador ternario; compatible con PS 5.1)
+                    # Validacion de tamaño (sin operador ternario; compatible con PS 5.1)
                     $size = 0
                     if (Test-Path $zipPath) {
                         try { $size = (Get-Item $zipPath).Length } catch { $size = 0 }
@@ -615,12 +615,12 @@ function DescargarFondosYProtectorDePantalla {
                 # 5.2 Limpiar y extraer
                 try {
                     if (Test-Path $extractFolder) {
-                        Write-Log "PASO 5.2: Limpiando extracción previa: $extractFolder" "DEBUG"
+                        Write-Log "PASO 5.2: Limpiando extraccion previa: $extractFolder" "DEBUG"
                         Remove-Item -Path $extractFolder -Recurse -Force
                     }
                     Write-Log "PASO 5.2: Extrayendo ZIP..." "INFO"
                     Expand-Archive -Path $zipPath -DestinationPath $extractFolder -Force -ErrorAction Stop
-                    Write-Log ("PASO 5.2: OK extracción -> {0}" -f $extractFolder) "INFO"
+                    Write-Log ("PASO 5.2: OK extraccion -> {0}" -f $extractFolder) "INFO"
                 }
                 catch {
                     Write-Warning "FALLO PASO 5.2 (Expand-Archive): $_"
@@ -644,7 +644,7 @@ function DescargarFondosYProtectorDePantalla {
                 # 5.4 Copiar/registrar Lively.scr (buscar cualquier .scr)
                 try {
                     $scrPath = Get-ChildItem -Path $extractFolder -Recurse -Include *.scr -File -ErrorAction SilentlyContinue | Select-Object -First 1
-                    if (-not $scrPath) { throw "No se encontró ningún .scr dentro del ZIP en $extractFolder." }
+                    if (-not $scrPath) { throw "No se encontro ningún .scr dentro del ZIP en $extractFolder." }
 
                     $scrLen = (Get-Item $scrPath.FullName).Length
                     if ($scrLen -lt $minScrBytes) {
@@ -734,14 +734,19 @@ function ConfigurarLivelyProtectorYFondo {
         }
 
         # 1. Importar el video a la biblioteca de Lively
-        if (Test-Path $videoPath) {
-            Write-Log "Importando video a la biblioteca de Lively..." "INFO"
-            Start-Process -FilePath $livelyExe -ArgumentList "addwallpaper", ""$videoPath""
+        if ([string]::IsNullOrWhiteSpace($videoPath)) {
+            Write-Warning "La variable videoPath está vacía o nula."
+            return
         }
-        else {
+
+        if (-not (Test-Path $videoPath)) {
             Write-Warning "No se encontro el archivo de video en: $videoPath"
             return
         }
+
+        Write-Log "Importando video a la biblioteca de Lively..." "INFO"
+        Start-Process -FilePath $livelyExe -ArgumentList @("addwallpaper", $videoPath)
+
 
         # 2. Registrar Lively.scr como protector de pantalla
         if (Test-Path $destScr) {
@@ -752,12 +757,12 @@ function ConfigurarLivelyProtectorYFondo {
 
             # 3. Aplicar el video como fondo temporalmente para activar el protector
             Write-Log "Aplicando video como fondo temporalmente para el protector..." "INFO"
-            Start-Process -FilePath $livelyExe -ArgumentList "setwp", "--file", ""$videoPath""
+            Start-Process -FilePath $livelyExe -ArgumentList @("setwp", "--file", $videoPath)
             Start-Sleep -Seconds 5
 
             # 4. Cerrar el fondo activo (el protector ya tomo el video)
             Write-Log "Cerrando fondo activo de Lively..." "INFO"
-            Start-Process -FilePath $livelyExe -ArgumentList "closewp", "-1"
+            Start-Process -FilePath $livelyExe -ArgumentList @("closewp", "-1")
             Start-Sleep -Seconds 2
 
             Write-Log "Proceso de configuracion del protector completado exitosamente." "INFO"
