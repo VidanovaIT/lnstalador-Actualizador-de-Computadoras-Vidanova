@@ -193,7 +193,7 @@ function InstalarSoporteFabricante {
     }
 
     if ($fab -eq "Desconocido" -or !$urls.ContainsKey($fab)) {
-        Write-Warning "Fabricante no reconocido. Se usará SDI Lite como solución de respaldo." "WARNING"
+        Write-Warning "Fabricante no reconocido. Se usará SDI Lite como solucion de respaldo." "WARNING"
         UsarSDILite
         return
     }
@@ -489,17 +489,16 @@ function DescargarFondosYProtectorDePantalla {
         $fondosPath = Join-Path $pictures "Fondos"
 
         $fondos = @(
-            @{ url = "https://drive.usercontent.google.com/download?id=1O2drBdLD7aPkpIdIGPB4hhUC6OH1LIh5&export=download"; nombre = "Fondo de Escritorio.png" },
-            @{ url = "https://drive.usercontent.google.com/download?id=1tOv6xbWirAet1gdMtESQYjaqTBK9RqI8&export=download"; nombre = "Fondo de Zoom.png" }
+            @{ url = "https://drive.usercontent.google.com/download?id=1TdkSn764_O6nw92BNvkpSPrczYEBrU84&export=download"; nombre = "Fondo de Escritorio.png" },
+            @{ url = "https://drive.usercontent.google.com/download?id=1XC6LxjhVAKNQDehwKVn-jPAOA4kvurvk&export=download"; nombre = "Fondo de Zoom.png" }
         )
 
         $videos = [Environment]::GetFolderPath("MyVideos")
         $videoDestino = Join-Path $videos "PROTECTOR-1.mp4"
         $videoUrl = "https://drive.usercontent.google.com/download?id=1bZyh8AuVB9I_ezN1bEHdtypxR5uXCCoB&export=download"
 
-        $installerUrl = "https://github.com/rocksdanister/lively/releases/download/v2.2.1.0/lively_setup_x86_full_v2210.exe"
-        $zipUrl = "https://github.com/rocksdanister/lively/releases/download/v2.2.1.0/lively_utility_screensaver.zip"
-        
+        # Sitio Oficial de Lively: https://rocksdanister.github.io/lively/
+        https://github.com/rocksdanister/lively/releases/download/v2.2.1.0/lively_setup_x86_full_v2210.exe
         $downloads = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'
         $installerOk = $false
         $extractFolder = Join-Path $downloads "lively_screensaver"
@@ -536,7 +535,7 @@ function DescargarFondosYProtectorDePantalla {
                 Write-Log "PASO 3: Descargando $($fondo.nombre)..." "INFO"
                 Invoke-WebRequest -Uri $fondo.url -OutFile $destino -UseBasicParsing -ErrorAction Stop
 
-                # Validación (mínimo 20 KB)
+                # Validacion (mínimo 20 KB)
                 if (-not (Test-Path $destino) -or (Get-Item $destino).Length -lt 20480) {
                     throw "Archivo incompleto o demasiado pequeño: $destino"
                 }
@@ -574,305 +573,140 @@ function DescargarFondosYProtectorDePantalla {
                 Write-Log "PASO 4: OK video → $videoDestino" "INFO"
             }
         }
-
-        # ================= PASO 5: Descargar e instalar Lively.scr =================
+        # ================= PASO 5: Descargar e instalar Lively (v2.2.1.0) =================
         try {
-            # 5.1 Descargar instalador Lively (con reintentos y validacion)
-            $maxTries = 3
-            $installerOk = $false
-                
-            for ($i = 1; $i -le $maxTries -and -not $installerOk; $i++) {
-                if (Test-Path $installerPath) {
-                    Remove-Item $installerPath -Force -ErrorAction SilentlyContinue 
-                }
-                Write-Log ("PASO 5.1.{0}: Descargando instalador Lively..." -f $i) "INFO"
+            $exeUrl = "https://github.com/rocksdanister/lively/releases/download/v2.2.1.0/lively_setup_x86_full_v2210.exe"
+            $downloads = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'
+            $exePath = Join-Path $downloads "lively_setup_x86_full_v2210.exe"
 
-                try { 
-                    # Usamos solo Invoke-WebRequest: más consistente en Win10/11
-                    Invoke-WebRequest -Uri $installerUrl `
-                        -OutFile $installerPath `
-                        -UseBasicParsing `
-                        -ErrorAction Stop
-                }
-                catch {
-                    Write-Warning "Fallo al descargar instalador (intento $i): $_"
-                    Start-Sleep -Seconds 2
-                    continue
-                }
-                # Validar tamaño mínimo
-                if (Test-Path $installerPath) {
-                    $size = (Get-Item $installerPath).Length
-                    if ($size -ge $minInstallerBytes) {
-                        $installerOk = $true
-                        Write-Log ("PASO 5.1.{0}: OK instalador descargado ({1} bytes)" -f $i, $size) "INFO"
-                    }
-                    else {
-                        Write-Warning "PASO 5.1: Instalador demasiado pequeño ($size bytes). Reintentando..."
-                    }
-                }
-                Start-Sleep -Seconds 2
+            # Si ya existe el instalador, omitir descarga
+            if (Test-Path $exePath) {
+                Write-Log "PASO 5: Instalador Lively ya descargado en $exePath, omitiendo descarga." "INFO"
             }
-
-            if (-not $installerOk) {
-                throw "No se logró descargar el instalador tras $maxTries intentos."
-            }
-            
-            # 5.2 Instalar Lively (silencioso y con control de tiempo)
-            try {
-                Write-Log "PASO 5.2: Verificando y cerrando procesos de Lively antes de instalar..." "INFO"
-
-                # Cierra cualquier proceso activo
-                $procNames = @("Lively", "Lively.App", "LivelyInstaller", "Lively.Wallpaper", "Lively.UI")
-                foreach ($name in $procNames) {
-                    $procs = Get-Process -Name $name -ErrorAction SilentlyContinue
-                    if ($procs) {
-                        foreach ($p in $procs) {
-                            Write-Log "Cerrando proceso $($p.ProcessName) (PID $($p.Id))..." "DEBUG"
-                            try { Stop-Process -Id $p.Id -Force -ErrorAction Stop } catch {}
-                        }
-                    }
-                }
-
-                # Esperar un poco
-                Start-Sleep -Seconds 3
-
-                # Iniciar instalación sin bloqueo
-                Write-Log "PASO 5.2: Ejecutando instalador de Lively (/VERYSILENT /NORESTART /SUPPRESSMSGBOXES)..." "INFO"
-                $process = Start-Process -FilePath $installerPath -ArgumentList "/VERYSILENT /NORESTART /SUPPRESSMSGBOXES" -PassThru -ErrorAction Stop
-
-                # Monitorear hasta 180 segundos (3 minutos) máx.
-                $timeout = 180
-                $elapsed = 0
-                $interval = 5
-
-                while (-not $process.HasExited -and $elapsed -lt $timeout) {
-                    Start-Sleep -Seconds $interval
-                    $elapsed += $interval
-                    Write-Log "PASO 5.2: Esperando finalización del instalador... ($elapsed s)" "DEBUG"
-                }
-
-                if (-not $process.HasExited) {
-                    Write-Warning "El instalador de Lively aún no terminó tras $timeout s, forzando cierre..."
-                    try {
-                        Stop-Process -Id $process.Id -Force -ErrorAction Stop
-                        Write-Log "PASO 5.2: Instalador forzado a cerrar tras $timeout segundos." "INFO"
-                    }
-                    catch {
-                        Write-Warning "No se pudo forzar el cierre del instalador: $_"
-                    }
-                }
-                else {
-                    Write-Log "PASO 5.2: Instalación completada correctamente en $elapsed segundos." "INFO"
-                }
-            }
-            catch {
-                Write-Warning "FALLO PASO 5.2 (instalación Lively): $_"
-            }
-
-
-
-            # 5.3 Screensaver: descargar, extraer, limpiar Instructions.txt, copiar y registrar
-            try {
-                Write-Log "PASO 5.3: Descargando screensaver (ZIP)..." "INFO"
-                for ($i = 1; $i -le 3 -and -not $zipOk; $i++) {
-                    if (
-                        Test-Path $zipPath) { Remove-Item $zipPath -Force -ErrorAction SilentlyContinue 
-                    }
-                    try { 
-                        Start-BitsTransfer -Source $zipUrl -Destination $zipPath -ErrorAction Stop
-                    }
-                    catch {
-                        Write-Warning "BITS falló, usando Invoke-WebRequest. $_"
-                        Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing -ErrorAction Stop
-                    }
-                    if ((Get-Item $zipPath).Length -ge $minZipBytes) { $zipOk = $true; Write-Log "PASO 5.3: ZIP descargado." "INFO" }
-                }
-                if (-not $zipOk) { throw "No se logró descargar lively_utility_screensaver.zip" }
-
-                # 5.3.a Extraer
-                if (Test-Path $extractFolder) { Remove-Item $extractFolder -Recurse -Force -ErrorAction SilentlyContinue }
-                Expand-Archive -Path $zipPath -DestinationPath $extractFolder -Force
-                Write-Log "PASO 5.3.a: ZIP extraído en $extractFolder" "INFO"
-
-                # 5.3.b Eliminar Instructions.txt (el archivo sí viene en el ZIP)
-                $instructions = Join-Path $extractFolder "Instructions.txt"
-                if (Test-Path $instructions) {
-                    Remove-Item $instructions -Force -ErrorAction SilentlyContinue
-                    Write-Log "PASO 5.3.b: Eliminado Instructions.txt" "INFO"
-                }
-                else {
-                    Write-Log "PASO 5.3.b: Instructions.txt no encontrado (ok)" "DEBUG"
-                }
-
-                # 5.3.c Copiar Lively.scr
-                $scrPath = Get-ChildItem -Path $extractFolder -Recurse -Include *.scr -File | Select-Object -First 1
-                if (-not $scrPath) { throw "No se encontró Lively.scr en el ZIP." }
-
-                $scrLen = (Get-Item $scrPath.FullName).Length
-                if ($scrLen -lt $minScrBytes) { Write-Warning ("PASO 5.3.c: Lively.scr tamaño inesperado ({0} bytes)" -f $scrLen) }
-
-                $copiedToWindows = $false
+            else {
+                Write-Log "PASO 5.1: Descargando instalador Lively v2.2.1.0..." "INFO"
                 try {
-                    Copy-Item -Path $scrPath.FullName -Destination $destinoScr -Force -ErrorAction Stop
-                    $copiedToWindows = $true
-                    Write-Log "PASO 5.3.c: Copiado Lively.scr a $destinoScr" "INFO"
+                    Start-BitsTransfer -Source $exeUrl -Destination $exePath -ErrorAction Stop
                 }
                 catch {
-                    Write-Warning "No se pudo copiar a C:\Windows (¿sin admin?). Usando directorio de usuario."
-                    if (-not (Test-Path $userScrDir)) { New-Item -ItemType Directory -Path $userScrDir | Out-Null }
-                    Copy-Item -Path $scrPath.FullName -Destination $userScr -Force
-                    Write-Log "PASO 5.3.c: Copia de usuario -> $userScr" "INFO"
+                    Write-Warning "BITS falló, usando Invoke-WebRequest: $_"
+                    Invoke-WebRequest -Uri $exeUrl -OutFile $exePath -UseBasicParsing -ErrorAction Stop
                 }
 
-                # 5.3.d Registrar screensaver y timeout
-                $regPath = 'HKCU:\Control Panel\Desktop'
-                if ($copiedToWindows) {
-                    $scrFinal = $destinoScr
+                # Validar tamaño mínimo (~50 MB)
+                if (-not (Test-Path $exePath) -or (Get-Item $exePath).Length -lt 50000000) {
+                    throw "El instalador parece incompleto: $exePath"
                 }
-                else {
-                    $scrFinal = $userScr
-                }
-                Set-ItemProperty -Path $regPath -Name 'SCRNSAVE.EXE' -Value $scrFinal
-                Set-ItemProperty -Path $regPath -Name 'ScreenSaveActive' -Value '1'
-                Set-ItemProperty -Path $regPath -Name 'ScreenSaveTimeOut' -Value '600'
-                Start-Process -FilePath "rundll32.exe" -ArgumentList "user32.dll,UpdatePerUserSystemParameters" -WindowStyle Hidden
-                Write-Log "PASO 5.3.d: Protector registrado → $scrFinal (timeout 10 min)" "INFO"
-
-                # Ejecutar instalador del .scr si se copió en C:\Windows (equivalente a clic derecho > Install)
-                if ($copiedToWindows -and (Test-Path $destinoScr)) {
-                    Start-Process -FilePath $destinoScr -ArgumentList "/install" -WindowStyle Hidden -ErrorAction SilentlyContinue
-                    Write-Log "PASO 5.3.d: Lively.scr instalado (handler del instalador ejecutado)" "INFO"
-                }
+                Write-Log "PASO 5.1: Instalador descargado correctamente → $exePath" "INFO"
             }
-            catch { Write-Warning "FALLO PASO 5.3 (screensaver): $_" }
 
-            # 5.4 Verificación final
+            # PASO 5.2: Ejecutar instalador en modo silencioso
+            Write-Log "PASO 5.2: Ejecutando instalador de Lively (modo silencioso)..." "INFO"
+
+            # Parametro /S instala silenciosamente (sin interfaz)
+            Start-Process -FilePath $exePath -ArgumentList "/S" -Wait -ErrorAction Stop
+
+            Write-Log "PASO 5.3: Instalación de Lively completada correctamente." "INFO"
+
+            # PASO 5.4: Registrar Lively como protector de pantalla
             try {
-                Write-Log "PASO 5.4: Verificando binario y .scr..." "INFO"
-
-                # Buscar Lively.exe en todas las rutas conocidas
-                $possiblePaths = @(
-                    "C:\Program Files\Lively Wallpaper\Lively.exe",
-                    "C:\Program Files (x86)\Lively Wallpaper\Lively.exe",
-                    "$env:LOCALAPPDATA\Programs\Lively Wallpaper\Lively.exe",
-                    "$env:LOCALAPPDATA\Programs\rocksdanister\Lively Wallpaper\Lively.exe",
-                    "$env:LOCALAPPDATA\Lively Wallpaper\Lively.exe"
-                )
-
-                $exe = $null
-                foreach ($path in $possiblePaths) {
-                    if (Test-Path $path) { $exe = $path; break }
-                }
-
-                if ($exe) {
-                    Write-Log "PASO 5.4: Lively.exe encontrado en: $exe" "INFO"
+                $scrPath = "C:\Program Files\Lively Wallpaper\Lively.scr"
+                if (Test-Path $scrPath) {
+                    $regPath = 'HKCU:\Control Panel\Desktop'
+                    Set-ItemProperty -Path $regPath -Name 'SCRNSAVE.EXE' -Value $scrPath
+                    Set-ItemProperty -Path $regPath -Name 'ScreenSaveActive' -Value '1'
+                    Set-ItemProperty -Path $regPath -Name 'ScreenSaveTimeOut' -Value '600'
+                    Start-Process -FilePath "rundll32.exe" -ArgumentList "user32.dll,UpdatePerUserSystemParameters" -WindowStyle Hidden
+                    Write-Log "PASO 5.4: Registrado Lively como protector de pantalla." "INFO"
                 }
                 else {
-                    Write-Warning "PASO 5.4: No se encontró Lively.exe en rutas conocidas."
-                }
-
-                if ((Test-Path $destinoScr) -or (Test-Path $userScr)) {
-                    Write-Log "PASO 5.4: Lively.scr verificado correctamente." "INFO"
-                }
-                else {
-                    Write-Warning "No se encontró Lively.scr"
+                    Write-Warning "PASO 5.4: No se encontró Lively.scr en la ruta esperada: $scrPath"
                 }
             }
             catch {
-                Write-Warning "FALLO PASO 5.4 (verificación): $_"
+                Write-Warning "FALLO PASO 5.4 (registro de protector): $_"
             }
-            Write-Log "PASO 5 COMPLETADO: Lively + screensaver listos." "INFO"
+
         }
         catch {
-            Write-Warning "FALLO GENERAL PASO 5: $_"
+            Write-Warning "FALLO PASO 5 (instalar Lively): $_"
         }
 
+        Write-Log "Proceso finalizado." "INFO"
     }
     catch {
         Write-Warning "ERROR GENERAL: $_"
     }
 }
 
-# =================== Configuración final del protector y fondo =====================
-# Esta función asume que Lively y el protector ya fueron descargados e instalados correctamente.
+# =================== Configura SOLO el protector de pantalla Lively ===================
 function ConfigurarLivelyProtectorYFondo {
-    Write-Log "Iniciando configuración del protector y fondo Lively..." "INFO"
+    Write-Log "Iniciando configuración SOLO del protector de pantalla Lively..." "INFO"
     try {
-        # ------------------ PASO 1: Localizar ejecutable Lively ------------------
+        # Buscar Lively ejecutable (v2.2.1.0)
         $livelyPaths = @(
+            "C:\Program Files\Lively Wallpaper\Lively.App.exe",
             "C:\Program Files\Lively Wallpaper\Lively.exe",
-            "C:\Program Files (x86)\Lively Wallpaper\Lively.exe",
-            "$env:LOCALAPPDATA\Programs\Lively Wallpaper\Lively.exe",
-            "$env:LOCALAPPDATA\Programs\rocksdanister\Lively Wallpaper\Lively.exe",
-            "$env:LOCALAPPDATA\Lively Wallpaper\Lively.exe"
+            "C:\Program Files (x86)\Lively Wallpaper\Lively.App.exe",
+            "C:\Program Files (x86)\Lively Wallpaper\Lively.exe"
         )
-
-        $livelyExe = $null
-        foreach ($path in $livelyPaths) {
-            if (Test-Path $path) { $livelyExe = $path; break }
-        }
+        $livelyExe = $livelyPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 
         if (-not $livelyExe) {
-            Write-Warning "No se encontró Lively.exe en ninguna ruta conocida. Asegúrate de haber completado la instalación."
+            Write-Warning "No se encontró Lively instalado. Instálalo antes de continuar."
             return
         }
 
-        Write-Log "Lively.exe detectado en: $livelyExe" "INFO"
-
-        # ------------------ PASO 2: Rutas de archivos ------------------
+        # Rutas de archivos multimedia
         $videoPath = Join-Path ([Environment]::GetFolderPath("MyVideos")) "PROTECTOR-1.mp4"
         $fondoPath = Join-Path ([Environment]::GetFolderPath("MyPictures")) "Fondos\Fondo de Escritorio.png"
-        $destScr = "C:\Windows\Lively.scr"
+        $destScr   = "C:\Program Files\Lively Wallpaper\Lively.scr"
 
-        # ------------------ PASO 3: Verificar recursos ------------------
+        # Paso 0: Establecer fondo de escritorio estático
+        if (Test-Path $fondoPath) {
+            Write-Log "Aplicando fondo de escritorio fijo desde Windows..." "INFO"
+            Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name wallpaper -Value $fondoPath
+            RUNDLL32.EXE user32.dll, UpdatePerUserSystemParameters
+            Write-Log "Fondo aplicado correctamente." "INFO"
+        }
+        else {
+            Write-Warning "No se encontró la imagen de fondo: $fondoPath"
+        }
+
+        # Paso 1: Validar video
         if (-not (Test-Path $videoPath)) {
             Write-Warning "No se encontró el video del protector en: $videoPath"
             return
         }
-        if (-not (Test-Path $destScr)) {
-            Write-Warning "No se encontró Lively.scr en: $destScr"
+
+        # Paso 2: Registrar Lively como protector de pantalla
+        if (Test-Path $destScr) {
+            Write-Log "Configurando Lively como protector de pantalla..." "INFO"
+            $regPath = "HKCU:\Control Panel\Desktop"
+            Set-ItemProperty -Path $regPath -Name "SCRNSAVE.EXE" -Value $destScr
+            Set-ItemProperty -Path $regPath -Name "ScreenSaveActive" -Value "1"
+            Set-ItemProperty -Path $regPath -Name "ScreenSaveTimeOut" -Value "300"
+            Write-Log "Protector configurado correctamente (5 minutos)." "INFO"
+        }
+        else {
+            Write-Warning "No se encontró Lively.scr en $destScr"
             return
         }
 
-        # ------------------ PASO 4: Establecer fondo clásico base ------------------
-        if (Test-Path $fondoPath) {
-            Write-Log "Aplicando fondo de escritorio base antes de configuración Lively..." "INFO"
-            Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name wallpaper -Value $fondoPath
-            RUNDLL32.EXE user32.dll, UpdatePerUserSystemParameters
-            Write-Log "Fondo clásico aplicado correctamente." "INFO"
-        }
-        else {
-            Write-Warning "No se encontró imagen base de fondo en: $fondoPath"
-        }
-
-        # ------------------ PASO 5: Configurar protector de pantalla ------------------
-        Write-Log "Configurando Lively.scr como protector de pantalla predeterminado..." "INFO"
-        $regPath = "HKCU:\Control Panel\Desktop"
-        Set-ItemProperty -Path $regPath -Name "SCRNSAVE.EXE" -Value $destScr
-        Set-ItemProperty -Path $regPath -Name "ScreenSaveActive" -Value 1
-        Set-ItemProperty -Path $regPath -Name "ScreenSaveTimeOut" -Value 600
-        Start-Process -FilePath "rundll32.exe" -ArgumentList "user32.dll,UpdatePerUserSystemParameters" -WindowStyle Hidden
-        Write-Log "Protector de pantalla Lively configurado exitosamente (timeout 10 min)." "INFO"
-
-        # ------------------ PASO 6: Importar video a la biblioteca ------------------
-        Write-Log "Importando video $videoPath a la biblioteca de Lively..." "INFO"
-        Start-Process -FilePath $livelyExe -ArgumentList "addwallpaper", "`"$videoPath`"" -WindowStyle Hidden
-        Start-Sleep -Seconds 3
-
-        # ------------------ PASO 7: Establecer video como fondo ------------------
-        Write-Log "Aplicando video como fondo temporal..." "INFO"
-        Start-Process -FilePath $livelyExe -ArgumentList "setwp", "--file", "`"$videoPath`"" -WindowStyle Hidden
+        # Paso 3: Importar video a la biblioteca (si no existe)
+        Write-Log "Importando video a Lively (sin aplicarlo como fondo)..." "INFO"
+        Start-Process -FilePath $livelyExe -ArgumentList @("import", "`"$videoPath`"") -WindowStyle Hidden
         Start-Sleep -Seconds 5
 
-        # ------------------ PASO 8: Cerrar fondo activo para que el protector quede configurado ------------------
-        Write-Log "Cerrando fondo activo de Lively (el protector queda configurado)..." "INFO"
-        Start-Process -FilePath $livelyExe -ArgumentList "closewp", "-1" -WindowStyle Hidden
+        # Paso 4: Asegurar que no quede activo como fondo
+        Write-Log "Cerrando cualquier fondo activo de Lively..." "INFO"
+        Start-Process -FilePath $livelyExe -ArgumentList "close all" -WindowStyle Hidden
         Start-Sleep -Seconds 2
 
-        Write-Log "Configuración del protector y fondo Lively completada exitosamente." "INFO"
+        Write-Log "✅ Configuración de Lively completada: solo protector activo, fondo estático." "INFO"
     }
     catch {
-        Write-Warning "Error durante la configuración del protector de pantalla Lively: $_"
+        Write-Warning "⚠️ Error en la configuración de Lively: $_"
     }
 }
 
