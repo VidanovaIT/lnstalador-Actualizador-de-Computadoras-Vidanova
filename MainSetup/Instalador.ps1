@@ -498,7 +498,7 @@ function DescargarFondosYProtectorDePantalla {
         $videoUrl = "https://drive.usercontent.google.com/download?id=1bZyh8AuVB9I_ezN1bEHdtypxR5uXCCoB&export=download"
 
         # Sitio Oficial de Lively: https://rocksdanister.github.io/lively/
-        https://github.com/rocksdanister/lively/releases/download/v2.2.1.0/lively_setup_x86_full_v2210.exe
+        # URL: https://github.com/rocksdanister/lively/releases/download/v2.2.1.0/lively_setup_x86_full_v2210.exe
         $downloads = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'
         $installerOk = $false
         $extractFolder = Join-Path $downloads "lively_screensaver"
