@@ -611,7 +611,80 @@ function DescargarFondosYProtectorDePantalla {
 
             Write-Log "PASO 5.3: Instalación de Lively completada correctamente." "INFO"
 
-            # PASO 5.4: Registrar Lively como protector de pantalla
+            # PASO 5.4: Descargar e instalar Lively Screensaver (Lively.scr)
+            try {
+                $scrZipUrl = "https://github.com/rocksdanister/lively/releases/download/v2.2.0.0/lively_utility_screensaver.zip"
+                $scrZipPath = Join-Path $downloads "lively_utility_screensaver.zip"
+                $scrExtractPath = Join-Path $downloads "lively_screensaver_temp"
+                $scrDestPath = "C:\Program Files\Lively Wallpaper\Lively.scr"
+
+                Write-Log "PASO 5.4: Descargando Lively Screensaver..." "INFO"
+                try {
+                    Start-BitsTransfer -Source $scrZipUrl -Destination $scrZipPath -ErrorAction Stop
+                }
+                catch {
+                    Write-Warning "BITS falló, usando Invoke-WebRequest: $_"
+                    Invoke-WebRequest -Uri $scrZipUrl -OutFile $scrZipPath -UseBasicParsing -ErrorAction Stop
+                }
+
+                # Validar descarga
+                if (-not (Test-Path $scrZipPath) -or (Get-Item $scrZipPath).Length -lt 4096) {
+                    throw "El archivo ZIP del screensaver parece incompleto: $scrZipPath"
+                }
+
+                Write-Log "PASO 5.4: Extrayendo Lively.scr..." "INFO"
+                # Crear carpeta temporal si no existe
+                if (Test-Path $scrExtractPath) {
+                    Remove-Item -Path $scrExtractPath -Recurse -Force
+                }
+                New-Item -ItemType Directory -Path $scrExtractPath -Force | Out-Null
+
+                # Extraer ZIP
+                Expand-Archive -Path $scrZipPath -DestinationPath $scrExtractPath -Force
+
+                # Buscar Lively.scr en la carpeta extraída
+                $scrFile = Get-ChildItem -Path $scrExtractPath -Filter "Lively.scr" -Recurse | Select-Object -First 1
+
+                if ($scrFile) {
+                    Write-Log "PASO 5.4: Copiando Lively.scr a: $scrDestPath" "INFO"
+                    
+                    # Asegurar que la carpeta de destino existe
+                    $scrDestDir = Split-Path -Path $scrDestPath -Parent
+                    if (-not (Test-Path $scrDestDir)) {
+                        New-Item -ItemType Directory -Path $scrDestDir -Force | Out-Null
+                    }
+
+                    # Copiar Lively.scr a la ubicación final
+                    Copy-Item -Path $scrFile.FullName -Destination $scrDestPath -Force
+
+                    # Verificar copia exitosa
+                    if (Test-Path $scrDestPath) {
+                        Write-Log "PASO 5.4: Lively.scr copiado exitosamente." "INFO"
+                    }
+                    else {
+                        Write-Warning "PASO 5.4: No se pudo copiar Lively.scr a: $scrDestPath"
+                    }
+                }
+                else {
+                    Write-Warning "PASO 5.4: No se encontró Lively.scr en el archivo extraído."
+                }
+
+                # Limpiar archivos temporales
+                Write-Log "PASO 5.4: Limpiando archivos temporales..." "INFO"
+                if (Test-Path $scrExtractPath) {
+                    Remove-Item -Path $scrExtractPath -Recurse -Force
+                }
+                if (Test-Path $scrZipPath) {
+                    Remove-Item -Path $scrZipPath -Force
+                }
+                Write-Log "PASO 5.4: Archivos temporales eliminados." "INFO"
+
+            }
+            catch {
+                Write-Warning "FALLO PASO 5.4 (instalar screensaver): $_"
+            }
+
+            # PASO 5.5: Registrar Lively como protector de pantalla
             try {
                 $scrPath = "C:\Program Files\Lively Wallpaper\Lively.scr"
                 if (Test-Path $scrPath) {
@@ -620,14 +693,14 @@ function DescargarFondosYProtectorDePantalla {
                     Set-ItemProperty -Path $regPath -Name 'ScreenSaveActive' -Value '1'
                     Set-ItemProperty -Path $regPath -Name 'ScreenSaveTimeOut' -Value '600'
                     Start-Process -FilePath "rundll32.exe" -ArgumentList "user32.dll,UpdatePerUserSystemParameters" -WindowStyle Hidden
-                    Write-Log "PASO 5.4: Registrado Lively como protector de pantalla." "INFO"
+                    Write-Log "PASO 5.5: Registrado Lively como protector de pantalla." "INFO"
                 }
                 else {
-                    Write-Warning "PASO 5.4: No se encontró Lively.scr en la ruta esperada: $scrPath"
+                    Write-Warning "PASO 5.5: No se encontró Lively.scr en la ruta esperada: $scrPath"
                 }
             }
             catch {
-                Write-Warning "FALLO PASO 5.4 (registro de protector): $_"
+                Write-Warning "FALLO PASO 5.5 (registro de protector): $_"
             }
 
         }
