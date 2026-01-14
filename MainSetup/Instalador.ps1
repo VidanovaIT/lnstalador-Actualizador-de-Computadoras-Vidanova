@@ -221,10 +221,10 @@ function InstalarSoporteFabricante {
     
     # Permitir al usuario decidir si usar SDI Lite como alternativa
     Write-Host ""
-    Write-Host "────────────────────────────────────────────────" -ForegroundColor Cyan
+    Write-Host "________________________________________________" -ForegroundColor Cyan
     Write-Host "¿Deseas usar SDI Lite como herramienta alternativa?" -ForegroundColor Cyan
-    Write-Host "SDI Lite descargará automáticamente los drivers más recientes." -ForegroundColor Cyan
-    Write-Host "────────────────────────────────────────────────" -ForegroundColor Cyan
+    Write-Host "SDI Lite descargara automáticamente los drivers mas recientes." -ForegroundColor Cyan
+    Write-Host "________________________________________________" -ForegroundColor Cyan
     Write-Host ""
     
     $usarSDILite = PedirConfirmacion "¿Usar SDI Lite? (y/n): "
@@ -1165,37 +1165,88 @@ function ConfigurarBarraTareasWindows11 {
             New-Item -Path $regPathSearch -Force | Out-Null
         }
         
+        $cambiosAplicados = $false
+        
         # 1. Alinear iconos de la barra de tareas a la izquierda
-        Write-Log "→ Alineando iconos a la izquierda..." "INFO"
-        Set-ItemProperty -Path $regPathExplorer -Name "TaskbarAl" -Value 0 -Type DWord -Force
-        
-        # 2. Ocultar vista de tareas (Task View)
-        Write-Log "→ Ocultando Vista de Tareas..." "INFO"
-        Set-ItemProperty -Path $regPathExplorer -Name "ShowTaskViewButton" -Value 0 -Type DWord -Force
-        
-        # 3. Ocultar Widgets (Noticias e intereses)
-        Write-Log "→ Ocultando Widgets y Noticias..." "INFO"
-        Set-ItemProperty -Path $regPathExplorer -Name "TaskbarDa" -Value 0 -Type DWord -Force
-        
-        # 4. Configurar búsqueda solo como icono
-        Write-Log "→ Configurando búsqueda solo como icono..." "INFO"
-        Set-ItemProperty -Path $regPathSearch -Name "SearchboxTaskbarMode" -Value 1 -Type DWord -Force
-        
-        # 5. Reiniciar el Explorador de Windows para aplicar cambios
-        Write-Log "→ Reiniciando Explorador de Windows para aplicar cambios..." "INFO"
         try {
-            Stop-Process -Name explorer -Force -ErrorAction Stop
-            Start-Sleep -Seconds 2
-            Start-Process explorer.exe
-            Start-Sleep -Seconds 3
-            Write-Log "✅ Configuración de barra de tareas completada exitosamente." "INFO"
-            Write-Log "   - Iconos alineados a la izquierda" "INFO"
-            Write-Log "   - Vista de Tareas oculta" "INFO"
-            Write-Log "   - Widgets/Noticias ocultos" "INFO"
-            Write-Log "   - Búsqueda configurada como icono" "INFO"
+            $valorActual = Get-ItemProperty -Path $regPathExplorer -Name "TaskbarAl" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty TaskbarAl
+            if ($valorActual -ne 0) {
+                Write-Log "→ Alineando iconos a la izquierda..." "INFO"
+                Set-ItemProperty -Path $regPathExplorer -Name "TaskbarAl" -Value 0 -Type DWord -Force -ErrorAction Stop
+                $cambiosAplicados = $true
+            }
+            else {
+                Write-Log "→ Iconos ya están alineados a la izquierda (valor actual: $valorActual)" "INFO"
+            }
         }
         catch {
-            Write-Warning "No se pudo reiniciar el Explorador automáticamente. Reinicia manualmente o cierra sesión para ver los cambios."
+            Write-Warning "Error al configurar alineación de iconos: $_"
+        }
+        
+        # 2. Ocultar vista de tareas (Task View)
+        try {
+            $valorActual = Get-ItemProperty -Path $regPathExplorer -Name "ShowTaskViewButton" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ShowTaskViewButton
+            if ($valorActual -ne 0) {
+                Write-Log "→ Ocultando Vista de Tareas..." "INFO"
+                Set-ItemProperty -Path $regPathExplorer -Name "ShowTaskViewButton" -Value 0 -Type DWord -Force -ErrorAction Stop
+                $cambiosAplicados = $true
+            }
+            else {
+                Write-Log "→ Vista de Tareas ya está oculta (valor actual: $valorActual)" "INFO"
+            }
+        }
+        catch {
+            Write-Warning "Error al configurar Vista de Tareas: $_"
+        }
+        
+        # 3. Ocultar Widgets (Noticias e intereses)
+        try {
+            $valorActual = Get-ItemProperty -Path $regPathExplorer -Name "TaskbarDa" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty TaskbarDa
+            if ($valorActual -ne 0) {
+                Write-Log "→ Ocultando Widgets y Noticias..." "INFO"
+                Set-ItemProperty -Path $regPathExplorer -Name "TaskbarDa" -Value 0 -Type DWord -Force -ErrorAction Stop
+                $cambiosAplicados = $true
+            }
+            else {
+                Write-Log "→ Widgets/Noticias ya están ocultos (valor actual: $valorActual)" "INFO"
+            }
+        }
+        catch {
+            Write-Warning "Error al configurar Widgets: $_"
+        }
+        
+        # 4. Configurar búsqueda solo como icono
+        try {
+            $valorActual = Get-ItemProperty -Path $regPathSearch -Name "SearchboxTaskbarMode" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty SearchboxTaskbarMode
+            if ($valorActual -ne 1) {
+                Write-Log "→ Configurando búsqueda solo como icono..." "INFO"
+                Set-ItemProperty -Path $regPathSearch -Name "SearchboxTaskbarMode" -Value 1 -Type DWord -Force -ErrorAction Stop
+                $cambiosAplicados = $true
+            }
+            else {
+                Write-Log "→ Búsqueda ya está configurada como icono (valor actual: $valorActual)" "INFO"
+            }
+        }
+        catch {
+            Write-Warning "Error al configurar búsqueda: $_"
+        }
+        
+        # 5. Reiniciar el Explorador de Windows solo si hubo cambios
+        if ($cambiosAplicados) {
+            Write-Log "→ Reiniciando Explorador de Windows para aplicar cambios..." "INFO"
+            try {
+                Stop-Process -Name explorer -Force -ErrorAction Stop
+                Start-Sleep -Seconds 2
+                Start-Process explorer.exe
+                Start-Sleep -Seconds 3
+                Write-Log "✅ Configuración de barra de tareas completada exitosamente." "INFO"
+            }
+            catch {
+                Write-Warning "No se pudo reiniciar el Explorador automáticamente. Reinicia manualmente o cierra sesión para ver los cambios."
+            }
+        }
+        else {
+            Write-Log "✅ Todas las configuraciones de barra de tareas ya estaban aplicadas. No se requieren cambios." "INFO"
         }
     }
     catch {
