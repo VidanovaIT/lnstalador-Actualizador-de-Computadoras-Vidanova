@@ -603,8 +603,11 @@ function DescargarFondosYProtectorDePantalla {
             # PASO 5.2: Ejecutar instalador en modo silencioso
             Write-Log "PASO 5.2: Ejecutando instalador de Lively (modo silencioso)..." "INFO"
 
-            # Parametro /S instala silenciosamente (sin interfaz)
-            Start-Process -FilePath $exePath -ArgumentList "/S" -Wait -ErrorAction Stop
+            # Parametros de InnoSetup para instalacion silenciosa:
+            # /VERYSILENT = No muestra dialogo de instalacion
+            # /NOAUTOLAUNCH = No abre Lively despues de instalar
+            # /NODEPENDENCIES = No instala vcredist/dotnet (opcionalmente)
+            Start-Process -FilePath $exePath -ArgumentList "/VERYSILENT /NOAUTOLAUNCH" -Wait -ErrorAction Stop
 
             Write-Log "PASO 5.3: Instalación de Lively completada correctamente." "INFO"
 
