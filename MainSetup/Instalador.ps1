@@ -379,8 +379,7 @@ function CrearAccesoDirectoEscritorio {
 }
 
 # Esta funcion instala Winget si no esta disponible.
-#
-function In icializarWinget {
+function InicializarWinget {
     Write-Host "`n--- Verificacion inicial de Winget ---`n"
 
     if (!(Get-Command winget -ErrorAction SilentlyContinue)) {
