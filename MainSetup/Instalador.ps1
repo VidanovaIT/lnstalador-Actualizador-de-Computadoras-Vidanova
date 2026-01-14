@@ -149,6 +149,19 @@ function UsarSDILite {
     }
 }
 
+# Funcion auxiliar para pedir confirmacion (y/n) o (Y/N)
+function PedirConfirmacion {
+    param([string]$pregunta)
+    
+    do {
+        $respuesta = Read-Host $pregunta
+        if ($respuesta -match "^[ySN]$|^[yN]$") {
+            return $respuesta.ToUpper() -eq "Y"
+        }
+        Write-Host "Por favor responde con 'y' o 'n' (o 'Y' o 'N')." -ForegroundColor Yellow
+    } while ($true)
+}
+
 # Instalar soporte de fabricante 
 function InstalarSoporteFabricante {
     param ([string]$fab)
@@ -205,6 +218,25 @@ function InstalarSoporteFabricante {
 
     Write-Log "Fabricante soportado. Se recomienda usar la página oficial para drivers:" "INFO"
     Write-Log " - ${fab}: $($urls[$fab])" "INFO"
+    
+    # Permitir al usuario decidir si usar SDI Lite como alternativa
+    Write-Host ""
+    Write-Host "────────────────────────────────────────────────" -ForegroundColor Cyan
+    Write-Host "¿Deseas usar SDI Lite como herramienta alternativa?" -ForegroundColor Cyan
+    Write-Host "SDI Lite descargará automáticamente los drivers más recientes." -ForegroundColor Cyan
+    Write-Host "────────────────────────────────────────────────" -ForegroundColor Cyan
+    Write-Host ""
+    
+    $usarSDILite = PedirConfirmacion "¿Usar SDI Lite? (y/n): "
+    
+    if ($usarSDILite) {
+        Write-Log "Usuario eligió usar SDI Lite." "INFO"
+        UsarSDILite
+    }
+    else {
+        Write-Log "Usuario decidió no usar SDI Lite en este momento." "INFO"
+        Write-Host "Puedes visitar la página oficial del fabricante más adelante si lo necesitas." -ForegroundColor Green
+    }
 
 }
 # =================== Funciones de Instalacion y Actualizacion de Programas =====================
@@ -348,7 +380,7 @@ function CrearAccesoDirectoEscritorio {
 
 # Esta funcion instala Winget si no esta disponible.
 #
-function InicializarWinget {
+function In icializarWinget {
     Write-Host "`n--- Verificacion inicial de Winget ---`n"
 
     if (!(Get-Command winget -ErrorAction SilentlyContinue)) {
@@ -1185,7 +1217,7 @@ try {
     InstalarSoporteFabricante -fab $fabricante
 
     #Aqui funcion de Programas
-    #InstalarYActualizarProgramas
+    InstalarYActualizarProgramas
     
     # Descargar fondos y video de protector de pantalla
     DescargarFondosYProtectorDePantalla
