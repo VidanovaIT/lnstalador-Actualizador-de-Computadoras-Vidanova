@@ -1527,9 +1527,9 @@ function ConfigurarBarraTareasWindows11 {
                 Write-Log "→ Ocultando Widgets y Noticias..." "INFO"
                 Set-ItemProperty -Path $regPathExplorer -Name "TaskbarDa" -Value 0 -Type DWord -Force -ErrorAction Stop
                 # Extras para asegurar desactivacion
-                New-ItemProperty -Path $regPathFeeds -Name "ShellFeedsTaskbarOpenOnHover" -Value 0 -PropertyType DWord -Force | Out-Null
-                New-ItemProperty -Path $regPathFeeds -Name "FeedsTaskbarEnabled" -Value 0 -PropertyType DWord -Force | Out-Null
-                New-ItemProperty -Path $regPolicyDsh -Name "AllowNewsAndInterests" -Value 0 -PropertyType DWord -Force | Out-Null
+                Set-ItemProperty -Path $regPathFeeds -Name "ShellFeedsTaskbarOpenOnHover" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+                Set-ItemProperty -Path $regPathFeeds -Name "FeedsTaskbarEnabled" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+                Set-ItemProperty -Path $regPolicyDsh -Name "AllowNewsAndInterests" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
                 $cambiosAplicados = $true
             }
             else {
@@ -1559,9 +1559,9 @@ function ConfigurarBarraTareasWindows11 {
         # 5. Ocultar boton Copilot si existe
         try {
             Write-Log "Ocultando boton de Copilot si aplica..." "INFO"
-            New-ItemProperty -Path $regPathExplorer -Name "ShowCopilotButton" -Value 0 -PropertyType DWord -Force | Out-Null
-            New-ItemProperty -Path $regPathExplorer -Name "TaskbarCopilot" -Value 0 -PropertyType DWord -Force | Out-Null
-            New-ItemProperty -Path $regPathCopilot -Name "IsCopilotVisible" -Value 0 -PropertyType DWord -Force | Out-Null
+            Set-ItemProperty -Path $regPathExplorer -Name "ShowCopilotButton" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+            Set-ItemProperty -Path $regPathExplorer -Name "TaskbarCopilot" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+            Set-ItemProperty -Path $regPathCopilot -Name "IsCopilotVisible" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
             $cambiosAplicados = $true
         }
         catch {
@@ -1616,7 +1616,7 @@ function GestionarAnclajeBarraTareas {
     $aplicacionesAnclar = @(
         @{ nombre = "Google Chrome"; patrones = @("*Google*Chrome*.lnk", "Chrome.lnk"); check = @("*Chrome*") },
         @{ nombre = "AnyDesk"; patrones = @("*AnyDesk*.lnk"); check = @("*AnyDesk*") },
-        @{ nombre = "Spotify"; patrones = @("*Spotify*.lnk"); check = @("*Spotify*") },
+        @{ nombre = "Spotify"; patrones = @("*Spotify*.lnk", "Spotify.lnk"); check = @("*Spotify*"); isUwp = $true },
         @{ nombre = "Mozilla Thunderbird"; patrones = @("*Thunderbird*.lnk"); check = @("*Thunderbird*") },
         @{ nombre = "WhatsApp"; patrones = @("*WhatsApp*.lnk"); check = @("*WhatsApp*") }
     )
@@ -1719,7 +1719,11 @@ function GestionarAnclajeBarraTareas {
                     } catch { Write-Log "  - Error anclando (UWP) $($entry.nombre): $_" "DEBUG" }
                 }
                 else {
-                    Write-Log "  - No se encontro: $($entry.nombre)" "DEBUG"
+                    if ($entry.nombre -eq "Spotify") {
+                        Write-Log "  - No se encontro: $($entry.nombre) (puede no estar instalado aún o ser instalado por Microsoft Store)" "DEBUG"
+                    } else {
+                        Write-Log "  - No se encontro: $($entry.nombre)" "DEBUG"
+                    }
                 }
             }
         }
