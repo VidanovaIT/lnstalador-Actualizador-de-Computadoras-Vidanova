@@ -544,6 +544,41 @@ function AbrirEnNavegador {
     }
 }
 
+# Ejecuta winget sin elevación mediante una tarea programada temporal (para MS Store)
+function EjecutarWingetUnelevated {
+    param(
+        [string]$argumentos,
+        [int]$timeoutSegundos = 300
+    )
+
+    try {
+        $taskName = "Vidanova_WingetUnelevated_" + ([System.Guid]::NewGuid().ToString())
+        $action = New-ScheduledTaskAction -Execute "winget.exe" -Argument $argumentos
+        $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddSeconds(6))
+        $principal = New-ScheduledTaskPrincipal -UserId $env:UserName -LogonType Interactive -RunLevel LeastPrivilege
+        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal | Out-Null
+
+        Start-ScheduledTask -TaskName $taskName
+        Write-Log "Winget (unelevated) iniciado: $argumentos" "INFO"
+
+        $start = Get-Date
+        do {
+            Start-Sleep -Seconds 2
+            $info = Get-ScheduledTask -TaskName $taskName | Get-ScheduledTaskInfo
+            if ($info.State -eq 'Ready' -and $info.LastRunTime -gt $start) { break }
+        } while ((New-TimeSpan -Start $start -End (Get-Date)).TotalSeconds -lt $timeoutSegundos)
+
+        # Obtener ultimo codigo (winget normalmente imprime en consola, no en Task Scheduler)
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+        Write-Log "Winget (unelevated) finalizado." "INFO"
+        return $true
+    }
+    catch {
+        Write-Log "Error ejecutando winget sin elevación: $_" "WARNING"
+        return $false
+    }
+}
+
 # Esta funcion descarga un archivo desde una URL y lo instala si es un ejecutable o MSI.
 # Si la descarga falla o el archivo no es valido, abre una pagina de instalacion manual.
 function InstalarDesdeWeb {
@@ -749,24 +784,40 @@ function InstalarYActualizarProgramas {
             
             # CASO ESPECIAL: Spotify no se puede instalar con Winget en contexto de administrador
             if ($programa.id -eq "Spotify.Spotify") {
-                Write-Log "Spotify detectado: usando método directo (instalador oficial)..." "INFO"
+                Write-Log "Spotify detectado: intentando instalación desde Microsoft Store (sin elevación)..." "INFO"
                 if ($programa.fallbackUrl) {
-                    InstalarDesdeWeb -nombre $programa.nombre -url $programa.fallbackUrl -archivo $programa.archivo -fallbackPage $programa.fallbackPage -RunUnelevated:$true
-                    # Esperar instalación (máximo ~2 minutos) verificando AppData
-                    $spotifyExe = Join-Path $env:APPDATA "Spotify\Spotify.exe"
-                    $maxWait = 120
-                    for ($i=0; $i -lt $maxWait; $i++) {
-                        if (Test-Path $spotifyExe) { break }
-                        Start-Sleep -Seconds 1
-                    }
-                    if (Test-Path $spotifyExe) {
-                        Write-Log "Spotify instalado correctamente en modo usuario." "INFO"
+                    # 1) Intento MS Store via winget sin elevación
+                    $msStoreId = "9NCBCSZSJRSB"
+                    $wingetArgs = "install --id $msStoreId --source msstore --accept-source-agreements --accept-package-agreements"
+                    $okMsStore = EjecutarWingetUnelevated -argumentos $wingetArgs -timeoutSegundos 240
+
+                    # Comprobar instalación AppX
+                    $spotifyAppx = Get-AppxPackage -Name "*Spotify*" -ErrorAction SilentlyContinue
+                    if ($okMsStore -and $spotifyAppx) {
+                        Write-Log "Spotify instalado desde Microsoft Store (AppX)." "INFO"
+                        Start-Sleep -Seconds 2
+                        CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
                     }
                     else {
-                        Write-Log "Spotify aún no aparece instalado (puede requerir interacción del usuario)." "WARNING"
+                        Write-Log "Instalación MS Store no confirmada; usando instalador EXE sin elevación..." "INFO"
+                        # 2) Fallback: instalador oficial EXE sin elevación
+                        InstalarDesdeWeb -nombre $programa.nombre -url $programa.fallbackUrl -archivo $programa.archivo -fallbackPage $programa.fallbackPage -RunUnelevated:$true
+                        # Esperar instalación (máximo ~2 minutos) verificando AppData
+                        $spotifyExe = Join-Path $env:APPDATA "Spotify\Spotify.exe"
+                        $maxWait = 120
+                        for ($i=0; $i -lt $maxWait; $i++) {
+                            if (Test-Path $spotifyExe) { break }
+                            Start-Sleep -Seconds 1
+                        }
+                        if (Test-Path $spotifyExe) {
+                            Write-Log "Spotify instalado correctamente en modo usuario." "INFO"
+                        }
+                        else {
+                            Write-Log "Spotify aún no aparece instalado (puede requerir interacción del usuario)." "WARNING"
+                        }
+                        Start-Sleep -Seconds 3
+                        CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
                     }
-                    Start-Sleep -Seconds 3
-                    CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
                 } else {
                     Write-Warning "No hay URL para Spotify. Se omitio la instalacion."
                 }
@@ -1200,17 +1251,18 @@ function ValidarYConvertirVideoLively {
     
     try {
         $ffmpegArgs = @(
-            "-i", "`"$videoPath`"",           # Input
-            "-c:v", "libx264",                # Video codec: H.264 (muy compatible)
-            "-preset", "fast",                # Velocidad: fast (balance calidad/tiempo)
-            "-crf", "23",                     # Quality (23 es bueno para screensavers)
-            "-s", "1920x1080",                # Resolución
-            "-r", "30",                       # Frame rate
-            "-b:v", "8M",                     # Video bitrate
-            "-c:a", "aac",                    # Audio codec
-            "-b:a", "128k",                   # Audio bitrate
-            "-y",                             # Sobrescribir sin preguntar
-            "`"$videoPathConverted`""         # Output
+            "-i", $videoPath,                  # Input
+            "-c:v", "libx264",               # Video codec: H.264 (muy compatible)
+            "-preset", "fast",               # Velocidad: fast (balance calidad/tiempo)
+            "-crf", "23",                    # Quality (23 es bueno para screensavers)
+            "-s", "1920x1080",               # Resolución
+            "-r", "30",                      # Frame rate
+            "-b:v", "8M",                    # Video bitrate
+            "-c:a", "aac",                   # Audio codec
+            "-b:a", "128k",                  # Audio bitrate
+            "-movflags", "+faststart",      # Optimiza reproducción
+            "-y",                              # Sobrescribir sin preguntar
+            $videoPathConverted                 # Output
         )
         
         & $ffmpegPath $ffmpegArgs 2>&1 | Out-Null
@@ -1518,7 +1570,7 @@ function ConfigurarBarraTareasWindows11 {
             $valorActual = Get-ItemProperty -Path $regPathExplorer -Name "TaskbarAl" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty TaskbarAl
             if ($valorActual -ne 0) {
                 Write-Log "→ Alineando iconos a la izquierda..." "INFO"
-                Set-ItemProperty -Path $regPathExplorer -Name "TaskbarAl" -Value 0 -Type DWord -Force -ErrorAction Stop
+                New-ItemProperty -Path $regPathExplorer -Name "TaskbarAl" -Value 0 -PropertyType DWord -Force -ErrorAction Stop
                 $cambiosAplicados = $true
             }
             else {
@@ -1534,7 +1586,7 @@ function ConfigurarBarraTareasWindows11 {
             $valorActual = Get-ItemProperty -Path $regPathExplorer -Name "ShowTaskViewButton" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ShowTaskViewButton
             if ($valorActual -ne 0) {
                 Write-Log "→ Ocultando Vista de Tareas..." "INFO"
-                Set-ItemProperty -Path $regPathExplorer -Name "ShowTaskViewButton" -Value 0 -Type DWord -Force -ErrorAction Stop
+                New-ItemProperty -Path $regPathExplorer -Name "ShowTaskViewButton" -Value 0 -PropertyType DWord -Force -ErrorAction Stop
                 $cambiosAplicados = $true
             }
             else {
@@ -1550,11 +1602,11 @@ function ConfigurarBarraTareasWindows11 {
             $valorActual = Get-ItemProperty -Path $regPathExplorer -Name "TaskbarDa" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty TaskbarDa
             if ($valorActual -ne 0) {
                 Write-Log "→ Ocultando Widgets y Noticias..." "INFO"
-                Set-ItemProperty -Path $regPathExplorer -Name "TaskbarDa" -Value 0 -Type DWord -Force -ErrorAction Stop
+                New-ItemProperty -Path $regPathExplorer -Name "TaskbarDa" -Value 0 -PropertyType DWord -Force -ErrorAction Stop
                 # Extras para asegurar desactivacion
-                Set-ItemProperty -Path $regPathFeeds -Name "ShellFeedsTaskbarOpenOnHover" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
-                Set-ItemProperty -Path $regPathFeeds -Name "FeedsTaskbarEnabled" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
-                Set-ItemProperty -Path $regPolicyDsh -Name "AllowNewsAndInterests" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+                New-ItemProperty -Path $regPathFeeds -Name "ShellFeedsTaskbarOpenOnHover" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+                New-ItemProperty -Path $regPathFeeds -Name "FeedsTaskbarEnabled" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+                New-ItemProperty -Path $regPolicyDsh -Name "AllowNewsAndInterests" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
                 $cambiosAplicados = $true
             }
             else {
@@ -1570,7 +1622,7 @@ function ConfigurarBarraTareasWindows11 {
             $valorActual = Get-ItemProperty -Path $regPathSearch -Name "SearchboxTaskbarMode" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty SearchboxTaskbarMode
             if ($valorActual -ne 1) {
                 Write-Log "→ Configurando búsqueda solo como icono..." "INFO"
-                Set-ItemProperty -Path $regPathSearch -Name "SearchboxTaskbarMode" -Value 1 -Type DWord -Force -ErrorAction Stop
+                New-ItemProperty -Path $regPathSearch -Name "SearchboxTaskbarMode" -Value 1 -PropertyType DWord -Force -ErrorAction Stop
                 $cambiosAplicados = $true
             }
             else {
@@ -1584,9 +1636,9 @@ function ConfigurarBarraTareasWindows11 {
         # 5. Ocultar boton Copilot si existe
         try {
             Write-Log "Ocultando boton de Copilot si aplica..." "INFO"
-            Set-ItemProperty -Path $regPathExplorer -Name "ShowCopilotButton" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
-            Set-ItemProperty -Path $regPathExplorer -Name "TaskbarCopilot" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
-            Set-ItemProperty -Path $regPathCopilot -Name "IsCopilotVisible" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+            New-ItemProperty -Path $regPathExplorer -Name "ShowCopilotButton" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+            New-ItemProperty -Path $regPathExplorer -Name "TaskbarCopilot" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+            New-ItemProperty -Path $regPathCopilot -Name "IsCopilotVisible" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
             $cambiosAplicados = $true
         }
         catch {
