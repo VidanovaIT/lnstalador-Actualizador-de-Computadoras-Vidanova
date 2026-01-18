@@ -1145,109 +1145,140 @@ function ConfigurarLivelyProtectorYFondo {
                 $settingsPath = Join-Path $livelyDataPath "Settings.json"
                 $libraryPath = Join-Path $livelyDataPath "Library\wallpapers"
                 
-                # Abrir Lively para crear estructura de carpetas
-                Write-Log "Paso 3.1: Iniciando Lively para crear estructura..." "INFO"
-                & $livelyExe app --showApp true
-                Start-Sleep -Seconds 8
-                
-                # Cerrar Lively antes de modificar archivos
-                Write-Log "Paso 3.2: Cerrando Lively temporalmente..." "INFO"
-                & $livelyExe app --shutdown true
-                Start-Sleep -Seconds 5
-                
-                # Crear carpeta para el video en la biblioteca
-                Write-Log "Paso 3.3: Creando entrada en biblioteca para el video..." "INFO"
-                
-                if (-not (Test-Path $libraryPath)) {
-                    New-Item -ItemType Directory -Path $libraryPath -Force | Out-Null
-                }
-                
-                # Generar nombre único para la carpeta del wallpaper
-                $uniqueId = -join ((65..90) + (97..122) | Get-Random -Count 8 | ForEach-Object {[char]$_})
-                $videoWallpaperFolder = Join-Path $libraryPath "${uniqueId}.mp4"
-                New-Item -ItemType Directory -Path $videoWallpaperFolder -Force | Out-Null
-                
-                # Copiar el video a la biblioteca
-                $videoDestInLibrary = Join-Path $videoWallpaperFolder "PROTECTOR-1.mp4"
-                Copy-Item -Path $videoPath -Destination $videoDestInLibrary -Force
-                Write-Log "Paso 3.3: Video copiado a biblioteca: $videoWallpaperFolder" "INFO"
-                
-                # Crear LivelyInfo.json para el video
-                $livelyInfo = @{
-                    AppVersion = "2.2.1.0"
-                    Title = "Protector Vidanova"
-                    Thumbnail = "PROTECTOR-1.mp4"
-                    Preview = "PROTECTOR-1.mp4"
-                    Desc = "Video protector de pantalla Vidanova"
-                    Author = "Vidanova"
-                    License = ""
-                    Contact = ""
-                    Type = 1  # Video type
-                    FileName = "PROTECTOR-1.mp4"
-                    Arguments = $null
-                    IsAbsolutePath = $false
-                }
-                
-                $livelyInfoPath = Join-Path $videoWallpaperFolder "LivelyInfo.json"
-                $livelyInfo | ConvertTo-Json -Depth 5 | Set-Content -Path $livelyInfoPath -Encoding UTF8 -Force
-                Write-Log "Paso 3.3: LivelyInfo.json creado correctamente" "INFO"
-                
-                # Iniciar Lively para que indexe el nuevo wallpaper
-                Write-Log "Paso 3.3: Iniciando Lively para indexar el wallpaper..." "INFO"
-                & $livelyExe app --showApp false
-                Start-Sleep -Seconds 5
-                
-                # Configurar como screensaver en Settings.json
-                Write-Log "Paso 3.4: Configurando screensaver en Settings.json..." "INFO"
-                
-                # Asegurarse de que Lively esté completamente cerrado antes de modificar el JSON
-                Get-Process -Name "Lively" -ErrorAction SilentlyContinue | Stop-Process -Force
-                Start-Sleep -Seconds 3
-                
-                # Crear Settings.json si no existe
-                if (-not (Test-Path $settingsPath)) {
-                    $defaultSettings = @{
-                        ScreensaverData = @{
-                            Wallpapers = @()
+                # Paso 3.0: Verificar si ya existe un protector configurado
+                Write-Log "Paso 3.0: Verificando si protector ya está configurado..." "INFO"
+                $protectorYaConfigurado = $false
+                if (Test-Path $settingsPath) {
+                    try {
+                        $settings = Get-Content -Path $settingsPath -Raw | ConvertFrom-Json
+                        if ($settings.PSObject.Properties.Name -contains "ScreensaverData" -and $settings.ScreensaverData.Wallpapers -and $settings.ScreensaverData.Wallpapers.Count -gt 0) {
+                            Write-Log "Paso 3.0: Protector de pantalla ya está configurado (encontrado en Settings.json)" "INFO"
+                            $protectorYaConfigurado = $true
                         }
                     }
-                    $defaultSettings | ConvertTo-Json -Depth 10 | Set-Content -Path $settingsPath -Encoding UTF8 -Force
+                    catch {
+                        Write-Log "Paso 3.0: No se pudo leer Settings.json anterior, configurando desde cero" "DEBUG"
+                    }
                 }
                 
-                $settings = Get-Content -Path $settingsPath -Raw | ConvertFrom-Json
-                
-                # Configurar screensaver con la ruta correcta del video
-                $screensaverConfig = @{
-                    Wallpapers = @(
-                        @{
-                            LivelyInfoFolderPath = $videoWallpaperFolder
-                        }
-                    )
-                }
-                
-                # Reemplazar o agregar la configuración de screensaver
-                if ($settings.PSObject.Properties.Name -contains "ScreensaverData") {
-                    $settings.ScreensaverData = $screensaverConfig
+                # Si el protector ya está configurado, omitir
+                if ($protectorYaConfigurado) {
+                    Write-Log "Paso 3: Omitiendo configuración (protector ya estaba configurado previamente)." "INFO"
                 }
                 else {
-                    $settings | Add-Member -MemberType NoteProperty -Name "ScreensaverData" -Value $screensaverConfig -Force
+                    # Abrir Lively para crear estructura de carpetas
+                    Write-Log "Paso 3.1: Iniciando Lively para crear estructura..." "INFO"
+                    & $livelyExe app --showApp true
+                    Start-Sleep -Seconds 8
+                    
+                    # Cerrar Lively antes de modificar archivos
+                    Write-Log "Paso 3.2: Cerrando Lively temporalmente..." "INFO"
+                    & $livelyExe app --shutdown true
+                    Start-Sleep -Seconds 5
+                    
+                    # Crear carpeta para el video en la biblioteca
+                    Write-Log "Paso 3.3: Creando entrada en biblioteca para el video..." "INFO"
+                    
+                    if (-not (Test-Path $libraryPath)) {
+                        New-Item -ItemType Directory -Path $libraryPath -Force | Out-Null
+                    }
+                    
+                    # Verificar si el video ya existe en la biblioteca
+                    $videoYaEnBiblioteca = Get-ChildItem -Path $libraryPath -Filter "PROTECTOR-1.mp4" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                    
+                    if ($videoYaEnBiblioteca) {
+                        Write-Log "Paso 3.3: Video ya existe en biblioteca: $($videoYaEnBiblioteca.Directory)" "INFO"
+                        $videoWallpaperFolder = $videoYaEnBiblioteca.Directory.FullName
+                    }
+                    else {
+                        # Generar nombre único para la carpeta del wallpaper
+                        $uniqueId = -join ((65..90) + (97..122) | Get-Random -Count 8 | ForEach-Object {[char]$_})
+                        $videoWallpaperFolder = Join-Path $libraryPath "${uniqueId}.mp4"
+                        New-Item -ItemType Directory -Path $videoWallpaperFolder -Force | Out-Null
+                        
+                        # Copiar el video a la biblioteca
+                        $videoDestInLibrary = Join-Path $videoWallpaperFolder "PROTECTOR-1.mp4"
+                        Copy-Item -Path $videoPath -Destination $videoDestInLibrary -Force
+                        Write-Log "Paso 3.3: Video copiado a biblioteca: $videoWallpaperFolder" "INFO"
+                    }
+                    
+                    # Crear o actualizar LivelyInfo.json para el video
+                    $livelyInfo = @{
+                        AppVersion = "2.2.1.0"
+                        Title = "Protector Vidanova"
+                        Thumbnail = "PROTECTOR-1.mp4"
+                        Preview = "PROTECTOR-1.mp4"
+                        Desc = "Video protector de pantalla Vidanova"
+                        Author = "Vidanova"
+                        License = ""
+                        Contact = ""
+                        Type = 1  # Video type
+                        FileName = "PROTECTOR-1.mp4"
+                        Arguments = $null
+                        IsAbsolutePath = $false
+                    }
+                    
+                    $livelyInfoPath = Join-Path $videoWallpaperFolder "LivelyInfo.json"
+                    $livelyInfo | ConvertTo-Json -Depth 5 | Set-Content -Path $livelyInfoPath -Encoding UTF8 -Force
+                    Write-Log "Paso 3.3: LivelyInfo.json creado/actualizado correctamente" "INFO"
+                    
+                    # Iniciar Lively para que indexe el nuevo wallpaper
+                    Write-Log "Paso 3.3: Iniciando Lively para indexar el wallpaper..." "INFO"
+                    & $livelyExe app --showApp false
+                    Start-Sleep -Seconds 5
+                    
+                    # Configurar como screensaver en Settings.json
+                    Write-Log "Paso 3.4: Configurando screensaver en Settings.json..." "INFO"
+                    
+                    # Asegurarse de que Lively esté completamente cerrado antes de modificar el JSON
+                    Get-Process -Name "Lively" -ErrorAction SilentlyContinue | Stop-Process -Force
+                    Start-Sleep -Seconds 3
+                    
+                    # Crear Settings.json si no existe
+                    if (-not (Test-Path $settingsPath)) {
+                        $defaultSettings = @{
+                            ScreensaverData = @{
+                                Wallpapers = @()
+                            }
+                        }
+                        $defaultSettings | ConvertTo-Json -Depth 10 | Set-Content -Path $settingsPath -Encoding UTF8 -Force
+                    }
+                    
+                    $settings = Get-Content -Path $settingsPath -Raw | ConvertFrom-Json
+                    
+                    # Configurar screensaver con la ruta correcta del video (solo si no está ya configurado)
+                    $screensaverConfig = @{
+                        Wallpapers = @(
+                            @{
+                                LivelyInfoFolderPath = $videoWallpaperFolder
+                            }
+                        )
+                    }
+                    
+                    # Reemplazar o agregar la configuración de screensaver
+                    if ($settings.PSObject.Properties.Name -contains "ScreensaverData") {
+                        $settings.ScreensaverData = $screensaverConfig
+                    }
+                    else {
+                        $settings | Add-Member -MemberType NoteProperty -Name "ScreensaverData" -Value $screensaverConfig -Force
+                    }
+                    
+                    # Guardar configuración
+                    $settings | ConvertTo-Json -Depth 10 | Set-Content -Path $settingsPath -Encoding UTF8 -Force
+                    Write-Log "Paso 3.4: Screensaver configurado en Settings.json: $videoWallpaperFolder" "INFO"
+                    
+                    # Abrir Lively para que cargue la nueva configuración
+                    Write-Log "Paso 3.5: Abriendo Lively para aplicar configuración..." "INFO"
+                    & $livelyExe app --showApp true
+                    Start-Sleep -Seconds 5
+                    
+                    # Cerrar Lively
+                    Write-Log "Paso 3.5: Cerrando Lively..." "INFO"
+                    & $livelyExe app --shutdown true
+                    Start-Sleep -Seconds 3
+                    
+                    Write-Log "Paso 3: Configuración completada exitosamente." "INFO"
                 }
-                
-                # Guardar configuración
-                $settings | ConvertTo-Json -Depth 10 | Set-Content -Path $settingsPath -Encoding UTF8 -Force
-                Write-Log "Paso 3.4: Screensaver configurado en Settings.json: $videoWallpaperFolder" "INFO"
-                
-                # Abrir Lively para que cargue la nueva configuración
-                Write-Log "Paso 3.5: Abriendo Lively para aplicar configuración..." "INFO"
-                & $livelyExe app --showApp true
-                Start-Sleep -Seconds 5
-                
-                # Cerrar Lively
-                Write-Log "Paso 3.5: Cerrando Lively..." "INFO"
-                & $livelyExe app --shutdown true
-                Start-Sleep -Seconds 3
-                
-                Write-Log "Paso 3: Configuración completada exitosamente." "INFO"
             }
             catch {
                 Write-Warning "Paso 3: Error configurando video: $_"
@@ -1589,5 +1620,15 @@ catch {
     Write-Log "Error critico: $_" "ERROR"
 }
 finally {
+    # Cerrar Explorador de Archivos si está abierto
+    Write-Log "Cerrando Explorador de Archivos si está abierto..." "INFO"
+    try {
+        Get-Process -Name explorer -ErrorAction SilentlyContinue | Stop-Process -Force
+        Start-Sleep -Seconds 1
+    }
+    catch {
+        Write-Log "No había Explorador abierto o ya estaba cerrado." "DEBUG"
+    }
+    
     Read-Host "Mantenimiento completado o detenido. Presione ENTER para salir"
 }
