@@ -551,7 +551,8 @@ function InstalarDesdeWeb {
         [string]$nombre,
         [string]$url,
         [string]$archivo,
-        [string]$fallbackPage
+        [string]$fallbackPage,
+        [switch]$RunUnelevated = $false
     )
     $ruta = "$env:TEMP\$archivo"
     Write-Log "Descargando $nombre desde: $url" "INFO"
@@ -602,37 +603,48 @@ function InstalarDesdeWeb {
                 }
             }
             elseif ($esExe -or ($archivo.ToLower().EndsWith(".exe") -and $tam -gt 800000)) {
-                Write-Log "Lanzando instalador EXE de $nombre en modo silencioso ($archivo, tam: $([Math]::Round($tam/1MB,2)) MB)..." "INFO"
-                try {
-                    # Intentar con argumentos silenciosos comunes
-                    $argumentosSilenciosos = "/S", "/SILENT", "/VERYSILENT", "/quiet"
-                    $resultado = $false
-                    
-                    foreach ($argumento in $argumentosSilenciosos) {
-                        try {
-                            Start-Process -FilePath $ruta -ArgumentList $argumento -Wait -ErrorAction Stop -WindowStyle Hidden
-                            $resultado = $true
-                            Write-Log "$nombre instalado exitosamente." "INFO"
-                            break
-                        }
-                        catch {
-                            # Intentar con el siguiente argumento
-                            continue
-                        }
+                if ($RunUnelevated) {
+                    Write-Log "Ejecutando instalador EXE de $nombre como usuario normal (sin elevación)..." "INFO"
+                    try {
+                        $shell = New-Object -ComObject Shell.Application
+                        $shell.ShellExecute($ruta, $null, (Split-Path $ruta -Parent), "open", 1)
+                        Write-Log "$nombre lanzado en modo usuario normal." "INFO"
                     }
-                    
-                    if (-not $resultado) {
-                        # Si ninguno funciona, ejecutar sin argumentos pero sin mostrar ventana
-                        Start-Process -FilePath $ruta -Wait -WindowStyle Hidden
-                        Write-Log "$nombre instalado (sin argumentos silenciosos)." "INFO"
+                    catch {
+                        Write-Warning "Fallo al ejecutar $nombre sin elevación: $_"
+                        if ($fallbackPage) {
+                            Write-Log "Abriendo pagina oficial para instalacion manual de $nombre..." "INFO"
+                            AbrirEnNavegador $fallbackPage
+                            Read-Host "Presione ENTER para continuar..."
+                        }
                     }
                 }
-                catch {
-                    Write-Warning "No se pudo ejecutar el instalador EXE de $nombre."
-                    if ($fallbackPage) {
-                        Write-Log "Abriendo pagina oficial para instalacion manual de $nombre..." "INFO"
-                        AbrirEnNavegador $fallbackPage
-                        Read-Host "Presione ENTER para continuar..."
+                else {
+                    Write-Log "Lanzando instalador EXE de $nombre en modo silencioso ($archivo, tam: $([Math]::Round($tam/1MB,2)) MB)..." "INFO"
+                    try {
+                        $argumentosSilenciosos = "/S", "/SILENT", "/VERYSILENT", "/quiet"
+                        $resultado = $false
+                        foreach ($argumento in $argumentosSilenciosos) {
+                            try {
+                                Start-Process -FilePath $ruta -ArgumentList $argumento -Wait -ErrorAction Stop -WindowStyle Hidden
+                                $resultado = $true
+                                Write-Log "$nombre instalado exitosamente." "INFO"
+                                break
+                            }
+                            catch { continue }
+                        }
+                        if (-not $resultado) {
+                            Start-Process -FilePath $ruta -Wait -WindowStyle Hidden
+                            Write-Log "$nombre instalado (sin argumentos silenciosos)." "INFO"
+                        }
+                    }
+                    catch {
+                        Write-Warning "No se pudo ejecutar el instalador EXE de $nombre."
+                        if ($fallbackPage) {
+                            Write-Log "Abriendo pagina oficial para instalacion manual de $nombre..." "INFO"
+                            AbrirEnNavegador $fallbackPage
+                            Read-Host "Presione ENTER para continuar..."
+                        }
                     }
                 }
             }
@@ -739,8 +751,21 @@ function InstalarYActualizarProgramas {
             if ($programa.id -eq "Spotify.Spotify") {
                 Write-Log "Spotify detectado: usando método directo (instalador oficial)..." "INFO"
                 if ($programa.fallbackUrl) {
-                    InstalarDesdeWeb -nombre $programa.nombre -url $programa.fallbackUrl -archivo $programa.archivo -fallbackPage $programa.fallbackPage
-                    Start-Sleep -Seconds 5
+                    InstalarDesdeWeb -nombre $programa.nombre -url $programa.fallbackUrl -archivo $programa.archivo -fallbackPage $programa.fallbackPage -RunUnelevated:$true
+                    # Esperar instalación (máximo ~2 minutos) verificando AppData
+                    $spotifyExe = Join-Path $env:APPDATA "Spotify\Spotify.exe"
+                    $maxWait = 120
+                    for ($i=0; $i -lt $maxWait; $i++) {
+                        if (Test-Path $spotifyExe) { break }
+                        Start-Sleep -Seconds 1
+                    }
+                    if (Test-Path $spotifyExe) {
+                        Write-Log "Spotify instalado correctamente en modo usuario." "INFO"
+                    }
+                    else {
+                        Write-Log "Spotify aún no aparece instalado (puede requerir interacción del usuario)." "WARNING"
+                    }
+                    Start-Sleep -Seconds 3
                     CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
                 } else {
                     Write-Warning "No hay URL para Spotify. Se omitio la instalacion."
