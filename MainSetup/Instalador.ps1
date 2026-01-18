@@ -1390,9 +1390,9 @@ function ConfigurarBarraTareasWindows11 {
     }
 }
 
-# =================== Función para Anclar/Desanclar Aplicaciones a la Barra de Tareas ===================
+# =================== Funcion para Anclar/Desanclar Aplicaciones a la Barra de Tareas ===================
 function GestionarAnclajeBarraTareas {
-    Write-Log "Iniciando gestión de aplicaciones ancladas en barra de tareas..." "INFO"
+    Write-Log "Iniciando gestion de aplicaciones ancladas en barra de tareas..." "INFO"
     
     # Aplicaciones a anclar
     $aplicacionesAnclar = @(
@@ -1407,27 +1407,14 @@ function GestionarAnclajeBarraTareas {
     $aplicacionesDesanclar = @("Outlook", "Copilot")
     
     try {
-        # ===== DESANCLAR APLICACIONES NO DESEADAS =====
-        Write-Log "Desanclando aplicaciones de Microsoft Store..." "INFO"
+        Write-Log "Desanclando aplicaciones no deseadas..." "INFO"
         
         foreach ($app in $aplicacionesDesanclar) {
             try {
-                Write-Log "  -> Buscando $app para desanclar..." "DEBUG"
-                
-                # Buscar en AppX packages
+                Write-Log "  - Buscando $app para desanclar..." "DEBUG"
                 $appxPackage = Get-AppxPackage -Name "*$app*" -ErrorAction SilentlyContinue | Select-Object -First 1
-                
                 if ($appxPackage) {
-                    Write-Log "  -> $app encontrado. Intentando desanclar..." "DEBUG"
-                    
-                    # Para desanclar, usamos el registro de Windows que mantiene los pines
-                    $taskbandPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband"
-                    Write-Log "  - Desanclar requiere interacción manual o cambios de registro." "DEBUG"
-                    Write-Log "  - Registro: $taskbandPath" "DEBUG"
-                    Write-Log "  ✓ Desanclar programado para: $app" "INFO"
-                }
-                else {
-                    Write-Log "  -> $app no encontrado o no está instalado" "DEBUG"
+                    Write-Log "  - $app encontrado en Microsoft Store" "DEBUG"
                 }
             }
             catch {
@@ -1435,14 +1422,12 @@ function GestionarAnclajeBarraTareas {
             }
         }
         
-        # ===== ANCLAR APLICACIONES DESEADAS =====
-        Write-Log "`nAnclando aplicaciones deseadas a barra de tareas..." "INFO"
+        Write-Log "Anclando aplicaciones deseadas..." "INFO"
         
         foreach ($app in $aplicacionesAnclar) {
             try {
-                Write-Log "  -> Buscando $($app.nombre)..." "DEBUG"
+                Write-Log "  - Buscando $($app.nombre)..." "DEBUG"
                 
-                # Resolver rutas con comodines
                 $rutaResolvida = $null
                 if ($app.buscar -like "*`**") {
                     $parentPath = Split-Path $app.buscar -Parent
@@ -1457,35 +1442,29 @@ function GestionarAnclajeBarraTareas {
                 }
                 
                 if ($rutaResolvida -and (Test-Path $rutaResolvida)) {
-                    Write-Log "  -> Anclando $($app.nombre) a barra de tareas..." "INFO"
+                    Write-Log "  - Anclando $($app.nombre) a barra de tareas..." "INFO"
                     
                     try {
-                        # Usar COM Shell.Application para anclar
                         $shell = New-Object -ComObject "Shell.Application"
                         $folder = $shell.Namespace((Split-Path $rutaResolvida))
                         $file = $folder.ParseName((Split-Path $rutaResolvida -Leaf))
-                        
-                        # Obtener el verbo para anclar
                         $verbs = $file.Verbs()
-                        $anclarVerbo = $verbs | Where-Object { 
-                            $_.Name -like "*Pin*" -or $_.Name -eq "Pin to Taskbar" -or $_.Name -like "*Anclar*"
-                        } | Select-Object -First 1
+                        $anclarVerbo = $verbs | Where-Object {$_.Name -like "*Pin*" -or $_.Name -eq "Pin to Taskbar"} | Select-Object -First 1
                         
                         if ($anclarVerbo) {
                             $anclarVerbo.DoIt()
-                            Write-Log "  ✓ Anclado correctamente: $($app.nombre)" "INFO"
+                            Write-Log "  - OK Anclado: $($app.nombre)" "INFO"
                         }
                         else {
-                            Write-Log "  - Verbo de anclaje no disponible para: $($app.nombre)" "DEBUG"
-                            Write-Log "  - Verbos disponibles: $($verbs.Name -join ', ')" "DEBUG"
+                            Write-Log "  - Verbo de anclaje no disponible" "DEBUG"
                         }
                     }
                     catch {
-                        Write-Log "  - Error al invocar verbo de anclaje: $_" "DEBUG"
+                        Write-Log "  - Error al anclar: $_" "DEBUG"
                     }
                 }
                 else {
-                    Write-Log "  - No se encontro ejecutable para: $($app.nombre)" "DEBUG"
+                    Write-Log "  - No se encontro: $($app.nombre)" "DEBUG"
                 }
             }
             catch {
@@ -1493,14 +1472,14 @@ function GestionarAnclajeBarraTareas {
             }
         }
         
-        Write-Log "Gestion de anclaje de barra de tareas completada." "INFO"
+        Write-Log "Gestion de anclaje completada." "INFO"
     }
     catch {
-        Write-Warning "Error en gestion de anclaje a barra de tareas: $_"
+        Write-Warning "Error en gestion de anclaje: $_"
     }
 }
 
-# =================== BLOQUE PRINCIPAL AQUi =====================
+# =================== BLOQUE PRINCIPAL AQUI =====================
 try {
     Write-Log "`nIniciando mantenimiento del sistema..." "INFO"
     VerificarConectividad
@@ -1531,5 +1510,5 @@ catch {
     Write-Log "Error critico: $_" "ERROR"
 }
 finally {
-    Read-Host "`nMantenimiento completado o detenido. Presione ENTER para salir"
+    Read-Host "Mantenimiento completado o detenido. Presione ENTER para salir"
 }
