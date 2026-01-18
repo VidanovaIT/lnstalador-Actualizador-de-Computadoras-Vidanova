@@ -733,29 +733,43 @@ function InstalarYActualizarProgramas {
         }
 
         if (-not $estaInstalado) {
-            Write-Log "No instalado. Intentando instalar con Winget..." "INFO"
+            Write-Log "No instalado. Intentando instalar..." "INFO"
             
-            try {
-                winget install --id $($programa.id) --silent --accept-source-agreements --accept-package-agreements 2>$null
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Log "$($programa.nombre) instalado correctamente." "INFO"
-                    Start-Sleep -Seconds 3
-                    # Crear acceso directo en escritorio
-                    CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
-                } else {
-                    throw "Winget retorno codigo: $LASTEXITCODE"
-                }
-            }
-            catch {
-                Write-Warning "Winget fallo: $_. Intentando metodo alternativo..."
-                
+            # CASO ESPECIAL: Spotify no se puede instalar con Winget en contexto de administrador
+            if ($programa.id -eq "Spotify.Spotify") {
+                Write-Log "Spotify detectado: usando método directo (instalador oficial)..." "INFO"
                 if ($programa.fallbackUrl) {
-                    Write-Log "Descargando desde URL alternativa..." "INFO"
                     InstalarDesdeWeb -nombre $programa.nombre -url $programa.fallbackUrl -archivo $programa.archivo -fallbackPage $programa.fallbackPage
                     Start-Sleep -Seconds 5
                     CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
                 } else {
-                    Write-Warning "No hay URL alternativa para $($programa.nombre). Se omitio la instalacion."
+                    Write-Warning "No hay URL para Spotify. Se omitio la instalacion."
+                }
+            }
+            else {
+                # Para otros programas, intentar Winget primero
+                try {
+                    winget install --id $($programa.id) --silent --accept-source-agreements --accept-package-agreements 2>$null
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Log "$($programa.nombre) instalado correctamente." "INFO"
+                        Start-Sleep -Seconds 3
+                        # Crear acceso directo en escritorio
+                        CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
+                    } else {
+                        throw "Winget retorno codigo: $LASTEXITCODE"
+                    }
+                }
+                catch {
+                    Write-Warning "Winget fallo: $_. Intentando metodo alternativo..."
+                    
+                    if ($programa.fallbackUrl) {
+                        Write-Log "Descargando desde URL alternativa..." "INFO"
+                        InstalarDesdeWeb -nombre $programa.nombre -url $programa.fallbackUrl -archivo $programa.archivo -fallbackPage $programa.fallbackPage
+                        Start-Sleep -Seconds 5
+                        CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
+                    } else {
+                        Write-Warning "No hay URL alternativa para $($programa.nombre). Se omitio la instalacion."
+                    }
                 }
             }
         }
@@ -1110,15 +1124,36 @@ function ValidarYConvertirVideoLively {
     if (-not $ffmpegPath) {
         Write-Log "FFmpeg no detectado. Intentando instalarlo con Winget..." "INFO"
         try {
-            winget install --id Gyan.FFmpeg --silent --accept-source-agreements --accept-package-agreements 2>$null
+            winget install --id Gyan.FFmpeg --silent --accept-source-agreements --accept-package-agreements --force 2>&1 | Out-Null
             Start-Sleep -Seconds 3
             
-            if (Get-Command ffmpeg.exe -ErrorAction SilentlyContinue) {
+            # Buscar FFmpeg nuevamente después de instalación (con refresh de PATH)
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+            
+            # Intentar encontrar FFmpeg en ubicaciones comunes
+            $ffmpegChecks = @(
+                "C:\Program Files\ffmpeg\bin\ffmpeg.exe",
+                "C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe",
+                "ffmpeg.exe"
+            )
+            
+            foreach ($checkPath in $ffmpegChecks) {
+                if (Test-Path $checkPath -ErrorAction SilentlyContinue) {
+                    $ffmpegPath = $checkPath
+                    break
+                }
+                if (Get-Command $checkPath -ErrorAction SilentlyContinue) {
+                    $ffmpegPath = $checkPath
+                    break
+                }
+            }
+            
+            if ($ffmpegPath) {
                 $ffmpegPath = "ffmpeg.exe"
                 Write-Log "FFmpeg instalado correctamente." "INFO"
             }
         } catch {
-            Write-Log "No se pudo instalar FFmpeg automáticamente. Usando video original." "WARNING"
+            Write-Log "No se pudo instalar FFmpeg automáticamente: $_. Usando video original." "WARNING"
             return $videoPath
         }
     }
@@ -1245,7 +1280,7 @@ function ConfigurarLivelyProtectorYFondo {
         # Paso 3: Configurar el video en Lively directamente en archivos de configuración
         Write-Log "Paso 3: Configurando video como screensaver en Lively..." "INFO"
         
-        if (Test-Path $videoPath) {
+        if (Test-Path $videoPathFinal) {
             try {
                 # Rutas de configuración de Lively
                 $livelyDataPath = "$env:LOCALAPPDATA\Lively Wallpaper"
