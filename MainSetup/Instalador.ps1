@@ -555,7 +555,7 @@ function EjecutarWingetUnelevated {
         $taskName = "Vidanova_WingetUnelevated_" + ([System.Guid]::NewGuid().ToString())
         $action = New-ScheduledTaskAction -Execute "winget.exe" -Argument $argumentos
         $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddSeconds(6))
-        $principal = New-ScheduledTaskPrincipal -UserId $env:UserName -LogonType Interactive -RunLevel LeastPrivilege
+        $principal = New-ScheduledTaskPrincipal -UserId $env:UserName -LogonType Interactive
         Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal | Out-Null
 
         Start-ScheduledTask -TaskName $taskName
@@ -784,39 +784,85 @@ function InstalarYActualizarProgramas {
             
             # CASO ESPECIAL: Spotify no se puede instalar con Winget en contexto de administrador
             if ($programa.id -eq "Spotify.Spotify") {
-                Write-Log "Spotify detectado: intentando instalación desde Microsoft Store (sin elevación)..." "INFO"
+                Write-Log "Spotify detectado: requiere instalación en contexto de usuario normal (no admin)..." "INFO"
                 if ($programa.fallbackUrl) {
-                    # 1) Intento MS Store via winget sin elevación
-                    $msStoreId = "9NCBCSZSJRSB"
-                    $wingetArgs = "install --id $msStoreId --source msstore --accept-source-agreements --accept-package-agreements"
-                    $okMsStore = EjecutarWingetUnelevated -argumentos $wingetArgs -timeoutSegundos 240
-
-                    # Comprobar instalación AppX
-                    $spotifyAppx = Get-AppxPackage -Name "*Spotify*" -ErrorAction SilentlyContinue
-                    if ($okMsStore -and $spotifyAppx) {
-                        Write-Log "Spotify instalado desde Microsoft Store (AppX)." "INFO"
+                    try {
+                        # 1) Intento MS Store via task scheduler (contexto usuario, LogonType Interactive)
+                        Write-Log "  Paso 1: Intentando instalación desde Microsoft Store (scheduled task)..." "DEBUG"
+                        $msStoreId = "9NCBCSZSJRSB"
+                        $taskNameSpotify = "Vidanova_InstallSpotify_" + ([System.Guid]::NewGuid().ToString())
+                        $actionSpotify = New-ScheduledTaskAction -Execute "winget.exe" -Argument "install --id $msStoreId --source msstore --accept-source-agreements --accept-package-agreements --force"
+                        $triggerSpotify = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddSeconds(5))
+                        $principalSpotify = New-ScheduledTaskPrincipal -UserId $env:UserName -LogonType Interactive
+                        
+                        Register-ScheduledTask -TaskName $taskNameSpotify -Action $actionSpotify -Trigger $triggerSpotify -Principal $principalSpotify -Force | Out-Null
+                        Start-ScheduledTask -TaskName $taskNameSpotify
+                        
+                        # Esperar completación (máx 3 minutos)
+                        $waitStart = Get-Date
+                        do {
+                            Start-Sleep -Seconds 3
+                            $taskInfo = Get-ScheduledTask -TaskName $taskNameSpotify | Get-ScheduledTaskInfo
+                        } while ($taskInfo.State -ne 'Ready' -and ((New-TimeSpan -Start $waitStart -End (Get-Date)).TotalSeconds -lt 180))
+                        
+                        Unregister-ScheduledTask -TaskName $taskNameSpotify -Confirm:$false -ErrorAction SilentlyContinue
+                        
                         Start-Sleep -Seconds 2
-                        CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
+                        $spotifyAppx = Get-AppxPackage -Name "*Spotify*" -ErrorAction SilentlyContinue
+                        if ($spotifyAppx) {
+                            Write-Log "✅ Spotify instalado desde Microsoft Store (AppX)." "INFO"
+                            CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
+                        } else {
+                            throw "Spotify AppX no detectado tras instalación MS Store"
+                        }
                     }
-                    else {
-                        Write-Log "Instalación MS Store no confirmada; usando instalador EXE sin elevación..." "INFO"
-                        # 2) Fallback: instalador oficial EXE sin elevación
-                        InstalarDesdeWeb -nombre $programa.nombre -url $programa.fallbackUrl -archivo $programa.archivo -fallbackPage $programa.fallbackPage -RunUnelevated:$true
-                        # Esperar instalación (máximo ~2 minutos) verificando AppData
-                        $spotifyExe = Join-Path $env:APPDATA "Spotify\Spotify.exe"
-                        $maxWait = 120
-                        for ($i=0; $i -lt $maxWait; $i++) {
-                            if (Test-Path $spotifyExe) { break }
-                            Start-Sleep -Seconds 1
+                    catch {
+                        Write-Log "  Paso 1 falló: $_" "DEBUG"
+                        Write-Log "  Paso 2: Intentando instalador EXE con Task Scheduler..." "DEBUG"
+                        
+                        try {
+                            # Descargar instalador
+                            $ruta = "$env:TEMP\SpotifySetup.exe"
+                            if (-not (Test-Path $ruta)) {
+                                Write-Log "  Descargando Spotify Setup..." "DEBUG"
+                                Invoke-WebRequest -Uri $programa.fallbackUrl -OutFile $ruta -UseBasicParsing -ErrorAction Stop
+                            }
+                            
+                            if (Test-Path $ruta) {
+                                # Crear tarea programada para ejecutar como usuario (no admin)
+                                $taskNameSpotifyExe = "Vidanova_InstallSpotifyExe_" + ([System.Guid]::NewGuid().ToString())
+                                $actionSpotifyExe = New-ScheduledTaskAction -Execute $ruta -WorkingDirectory (Split-Path $ruta)
+                                $triggerSpotifyExe = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddSeconds(5))
+                                $principalSpotifyExe = New-ScheduledTaskPrincipal -UserId $env:UserName -LogonType Interactive
+                                
+                                Register-ScheduledTask -TaskName $taskNameSpotifyExe -Action $actionSpotifyExe -Trigger $triggerSpotifyExe -Principal $principalSpotifyExe -Force | Out-Null
+                                Write-Log "  Lanzando instalador EXE como usuario normal (por favor completa la instalación)..." "INFO"
+                                Start-ScheduledTask -TaskName $taskNameSpotifyExe
+                                
+                                # Esperar a que Spotify esté disponible (máx 5 minutos)
+                                $spotifyExe = Join-Path $env:APPDATA "Spotify\Spotify.exe"
+                                $waitStart = Get-Date
+                                do {
+                                    Start-Sleep -Seconds 3
+                                } while (-not (Test-Path $spotifyExe) -and ((New-TimeSpan -Start $waitStart -End (Get-Date)).TotalSeconds -lt 300))
+                                
+                                Unregister-ScheduledTask -TaskName $taskNameSpotifyExe -Confirm:$false -ErrorAction SilentlyContinue
+                                
+                                if (Test-Path $spotifyExe) {
+                                    Write-Log "✅ Spotify instalado correctamente en %APPDATA%\Spotify" "INFO"
+                                    CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
+                                } else {
+                                    Write-Log "⚠️  Spotify aún no aparece instalado (puede requerir interacción del usuario o permisos)." "WARNING"
+                                    Write-Log "  Abriendo página de descarga para instalación manual..." "INFO"
+                                    AbrirEnNavegador $programa.fallbackPage
+                                }
+                            }
                         }
-                        if (Test-Path $spotifyExe) {
-                            Write-Log "Spotify instalado correctamente en modo usuario." "INFO"
+                        catch {
+                            Write-Log "  Paso 2 también falló: $_" "DEBUG"
+                            Write-Log "⚠️  No se pudo instalar Spotify automáticamente. Por favor instala manualmente." "WARNING"
+                            AbrirEnNavegador $programa.fallbackPage
                         }
-                        else {
-                            Write-Log "Spotify aún no aparece instalado (puede requerir interacción del usuario)." "WARNING"
-                        }
-                        Start-Sleep -Seconds 3
-                        CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
                     }
                 } else {
                     Write-Warning "No hay URL para Spotify. Se omitio la instalacion."
@@ -1251,23 +1297,26 @@ function ValidarYConvertirVideoLively {
     
     try {
         $ffmpegArgs = @(
-            "-i", $videoPath,                  # Input
-            "-c:v", "libx264",               # Video codec: H.264 (muy compatible)
-            "-preset", "fast",               # Velocidad: fast (balance calidad/tiempo)
-            "-crf", "23",                    # Quality (23 es bueno para screensavers)
-            "-s", "1920x1080",               # Resolución
-            "-r", "30",                      # Frame rate
-            "-b:v", "8M",                    # Video bitrate
-            "-c:a", "aac",                   # Audio codec
-            "-b:a", "128k",                  # Audio bitrate
-            "-movflags", "+faststart",      # Optimiza reproducción
-            "-y",                              # Sobrescribir sin preguntar
-            $videoPathConverted                 # Output
+            "-i", $videoPath,
+            "-c:v", "libx264",
+            "-preset", "medium",
+            "-crf", "23",
+            "-s", "1920x1080",
+            "-r", "30",
+            "-b:v", "8M",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-movflags", "+faststart",
+            "-y",
+            $videoPathConverted
         )
         
-        & $ffmpegPath $ffmpegArgs 2>&1 | Out-Null
+        Write-Log "Ejecutando FFmpeg: $ffmpegPath" "DEBUG"
+        $ffmpegOutput = & $ffmpegPath $ffmpegArgs 2>&1
         
-        if (Test-Path $videoPathConverted) {
+        Start-Sleep -Seconds 2
+        
+        if (Test-Path $videoPathConverted -ErrorAction SilentlyContinue) {
             $originalSize = (Get-Item $videoPath).Length / 1MB
             $convertedSize = (Get-Item $videoPathConverted).Length / 1MB
             Write-Log "✅ Video convertido exitosamente." "INFO"
@@ -1275,7 +1324,11 @@ function ValidarYConvertirVideoLively {
             Write-Log "  - Convertido: $([Math]::Round($convertedSize, 2)) MB" "INFO"
             return $videoPathConverted
         } else {
-            Write-Log "Error: FFmpeg no generó el archivo convertido." "WARNING"
+            Write-Log "FFmpeg completó pero archivo no se generó. Últimas líneas:" "WARNING"
+            if ($ffmpegOutput) {
+                $ffmpegOutput | Select-Object -Last 5 | ForEach-Object { Write-Log "  $_" "DEBUG" }
+            }
+            Write-Log "Usando video original." "INFO"
             return $videoPath
         }
     }
@@ -1545,6 +1598,7 @@ function ConfigurarBarraTareasWindows11 {
         $regPathFeeds = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds"
         $regPolicyDsh = "HKLM:\SOFTWARE\Policies\Microsoft\Dsh"
         $regPathCopilot = "HKCU:\Software\Microsoft\Windows\Shell\Copilot"
+        $regPolicyWidgets = "HKCU:\Software\Policies\Microsoft\Windows\Widgets"
         
         # Asegurar que las rutas del registro existan
         if (-not (Test-Path $regPathExplorer)) {
@@ -1561,6 +1615,9 @@ function ConfigurarBarraTareasWindows11 {
         }
         if (-not (Test-Path $regPathCopilot)) {
             New-Item -Path $regPathCopilot -Force | Out-Null
+        }
+        if (-not (Test-Path $regPolicyWidgets)) {
+            New-Item -Path $regPolicyWidgets -Force | Out-Null
         }
         
         $cambiosAplicados = $false
@@ -1597,20 +1654,36 @@ function ConfigurarBarraTareasWindows11 {
             Write-Warning "Error al configurar Vista de Tareas: $_"
         }
         
-        # 3. Ocultar Widgets (Noticias e intereses)
+        # 3. Ocultar y deshabilitar completamente Widgets
         try {
             $valorActual = Get-ItemProperty -Path $regPathExplorer -Name "TaskbarDa" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty TaskbarDa
             if ($valorActual -ne 0) {
-                Write-Log "→ Ocultando Widgets y Noticias..." "INFO"
+                Write-Log "→ Deshabilitando completamente Widgets..." "INFO"
+                
+                # 3a) Ocultar botón en taskbar
                 New-ItemProperty -Path $regPathExplorer -Name "TaskbarDa" -Value 0 -PropertyType DWord -Force -ErrorAction Stop
-                # Extras para asegurar desactivacion
+                
+                # 3b) Aplicar política de grupo
+                New-ItemProperty -Path $regPolicyWidgets -Name "AllowWidgets" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+                
+                # 3c) Desactivar feeds
                 New-ItemProperty -Path $regPathFeeds -Name "ShellFeedsTaskbarOpenOnHover" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
                 New-ItemProperty -Path $regPathFeeds -Name "FeedsTaskbarEnabled" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
                 New-ItemProperty -Path $regPolicyDsh -Name "AllowNewsAndInterests" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+                
+                # 3d) Detener y deshabilitar WidgetService
+                try {
+                    Stop-Service -Name 'WidgetService' -Force -ErrorAction SilentlyContinue
+                    Set-Service -Name 'WidgetService' -StartupType Disabled -ErrorAction SilentlyContinue
+                    Write-Log "→ Servicio WidgetService deshabilitado." "DEBUG"
+                } catch {
+                    Write-Log "→ WidgetService no disponible en esta build." "DEBUG"
+                }
+                
                 $cambiosAplicados = $true
             }
             else {
-                Write-Log "→ Widgets/Noticias ya están ocultos (valor actual: $valorActual)" "INFO"
+                Write-Log "→ Widgets ya están deshabilitados (valor actual: $valorActual)" "INFO"
             }
         }
         catch {
@@ -1645,19 +1718,28 @@ function ConfigurarBarraTareasWindows11 {
             Write-Log "No se pudo ocultar Copilot automaticamente: $_" "WARNING"
         }
         
-        # 5. Reiniciar el Explorador de Windows solo si hubo cambios
-        if ($cambiosAplicados) {
-            Write-Log "→ Reiniciando Explorador de Windows para aplicar cambios..." "INFO"
+        # 5. Reiniciar Explorador y forzar actualización de configuración
+        Write-Log "→ Aplicando cambios de configuración (reiniciando Explorer)..." "INFO"
+        try {
+            # Matar explorer y procesos widget
+            Get-Process -Name explorer -ErrorAction SilentlyContinue | Stop-Process -Force
+            Get-Process -Name "Widget*" -ErrorAction SilentlyContinue | Stop-Process -Force
+            Start-Sleep -Seconds 3
+            
+            # Forzar actualización del sistema
             try {
-                Stop-Process -Name explorer -Force -ErrorAction Stop
-                Start-Sleep -Seconds 2
-                Start-Process explorer.exe
-                Start-Sleep -Seconds 3
-                Write-Log "✅ Configuración de barra de tareas completada exitosamente." "INFO"
-            }
-            catch {
-                Write-Warning "No se pudo reiniciar el Explorador automáticamente. Reinicia manualmente o cierra sesión para ver los cambios."
-            }
+                rundll32.exe user32.dll,UpdatePerUserSystemParameters -ErrorAction SilentlyContinue
+            } catch { }
+            
+            # Reiniciar explorer
+            Start-Process explorer.exe
+            Start-Sleep -Seconds 3
+            
+            Write-Log "✅ Configuración de barra de tareas aplicada exitosamente." "INFO"
+            Write-Log "📝 Si Widgets aún persisten, cierra sesión y vuelve a iniciar para aplicar cambios de política completos." "INFO"
+        }
+        catch {
+            Write-Warning "No se pudo reiniciar Explorer automáticamente. Reinicia manualmente si es necesario."
         }
         else {
             Write-Log "✅ Todas las configuraciones de barra de tareas ya estaban aplicadas. No se requieren cambios." "INFO"
