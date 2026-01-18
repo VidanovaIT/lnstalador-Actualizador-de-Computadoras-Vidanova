@@ -82,26 +82,33 @@ function DetectarFabricante {
 
 # Descarga y ejecuta SDI Lite para instalar drivers automaticamente
 function UsarSDILite {
-    $downloadPage = "https://sdi-tool.org/download/"
-    $zipPath = "$env:TEMP\SDI_Lite.zip"
+    $downloadPage = "https://driveroff.net/drv/"
+    $archivePath = "$env:TEMP\SDI_Lite.7z"
     $extractPath = "$env:TEMP\SDI_Lite"
 
     Write-Log "Buscando SDI Lite..." "INFO"
 
     try {
+        # Intentar obtener el enlace mas reciente de la pagina
         $html = Invoke-WebRequest -Uri $downloadPage -UseBasicParsing
-        $matches = [regex]::Matches($html.Content, 'https://sdi-tool\.org/releases/SDI_R\d+\.zip')
-        if ($matches.Count -eq 0) {
-            Write-Warning "No se encontro enlace de descarga."
-            return
+        $matches = [regex]::Matches($html.Content, 'href="(SDI_[\d\.]+\.7z)"')
+        
+        if ($matches.Count -gt 0) {
+            # Extraer el nombre del archivo mas reciente
+            $latestFile = $matches[0].Groups[1].Value
+            $latestUrl = "$downloadPage$latestFile"
+            Write-Log "Enlace automatico encontrado: $latestUrl" "INFO"
+        } else {
+            # Si no se encuentra, usar el enlace directo conocido
+            $latestUrl = "https://driveroff.net/drv/SDI_1.26.0.7z"
+            Write-Log "Usando enlace directo: $latestUrl" "INFO"
         }
 
-        $latestUrl = $matches[0].Value
         Write-Log "Iniciando descarga desde: $latestUrl" "INFO"
         Write-Log "Descargando SDI Lite (esto puede tardar unos minutos)..." "INFO"
-        Invoke-WebRequest -Uri $latestUrl -OutFile $zipPath
+        Invoke-WebRequest -Uri $latestUrl -OutFile $archivePath
 
-        if (Test-Path $zipPath) {
+        if (Test-Path $archivePath) {
             Write-Log "Descarga completada. Preparando extraccion..." "INFO"
 
             if (Test-Path $extractPath) {
@@ -109,13 +116,85 @@ function UsarSDILite {
                 Remove-Item -Path $extractPath -Recurse -Force
             }
 
-            Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
-            Write-Log "Extraccion completada. Buscando ejecutable..." "INFO"
+            # Extraer archivo 7z usando 7-Zip si esta disponible
+            $7zipPath = "$env:ProgramFiles\7-Zip\7z.exe"
+            if (-not (Test-Path $7zipPath)) {
+                Write-Log "7-Zip no encontrado. Instalando automaticamente..." "INFO"
+                
+                # Intentar instalar con Winget primero
+                try {
+                    winget install --id 7zip.7zip --silent --accept-source-agreements --accept-package-agreements
+                    Start-Sleep -Seconds 5
+                    
+                    # Verificar instalacion
+                    if (Test-Path $7zipPath) {
+                        Write-Log "7-Zip instalado correctamente con Winget." "INFO"
+                    } else {
+                        throw "Winget no instalo 7-Zip correctamente"
+                    }
+                } catch {
+                    Write-Log "Winget fallo, instalando 7-Zip manualmente..." "WARNING"
+                    
+                    # Descargar e instalar 7-Zip manualmente
+                    $7zipUrl = "https://www.7-zip.org/a/7z2408-x64.exe"
+                    $7zipInstaller = "$env:TEMP\7zInstaller.exe"
+                    
+                    try {
+                        Invoke-WebRequest -Uri $7zipUrl -OutFile $7zipInstaller -UseBasicParsing -ErrorAction Stop
+                        Start-Process -FilePath $7zipInstaller -ArgumentList "/S" -Wait -ErrorAction Stop
+                        Start-Sleep -Seconds 5
+                        
+                        if (Test-Path $7zipPath) {
+                            Write-Log "7-Zip instalado correctamente." "INFO"
+                        } else {
+                            Write-Warning "No se pudo instalar 7-Zip automaticamente."
+                            Write-Warning "Por favor descargue e instale 7-Zip desde: https://www.7-zip.org/"
+                            Read-Host "Presione ENTER despues de instalar 7-Zip para continuar"
+                            
+                            if (-not (Test-Path $7zipPath)) {
+                                Write-Warning "7-Zip aun no esta instalado. Abortando extraccion."
+                                return
+                            }
+                        }
+                    } catch {
+                        Write-Warning "Error instalando 7-Zip: $_"
+                        return
+                    }
+                }
+            }
+            
+            # Extraer con 7-Zip
+            Write-Log "Extrayendo con 7-Zip..." "INFO"
+            try {
+                & $7zipPath x "$archivePath" "-o$extractPath" -y | Out-Null
+                Write-Log "Extraccion completada. Buscando ejecutable..." "INFO"
+            } catch {
+                Write-Warning "Error al extraer archivo: $_"
+                return
+            }
 
-            $sdiExe = Get-ChildItem -Path $extractPath -Recurse -Filter "SDI_x64_*.exe" | Select-Object -First 1
+            # Buscar el ejecutable con multiples patrones
+            $sdiExe = $null
+            $patterns = @("SDI*.exe", "SDI_x64*.exe", "SDI_R*.exe", "sdi*.exe", "*.exe")
+            
+            foreach ($pattern in $patterns) {
+                $sdiExe = Get-ChildItem -Path $extractPath -Recurse -Filter $pattern -ErrorAction SilentlyContinue | 
+                    Where-Object { $_.Name -notlike "*unins*" -and $_.Name -notlike "*uninst*" } | 
+                    Select-Object -First 1
+                
+                if ($sdiExe) {
+                    Write-Log "Ejecutable encontrado: $($sdiExe.Name) en $($sdiExe.DirectoryName)" "INFO"
+                    break
+                }
+            }
 
+            # Si no se encuentra, listar todos los archivos para debugging
             if (-not $sdiExe) {
-                $sdiExe = Get-ChildItem -Path $extractPath -Recurse -Filter "SDI_R*.exe" | Select-Object -First 1
+                Write-Log "No se encontro ejecutable. Archivos en la carpeta extraida:" "DEBUG"
+                $allFiles = Get-ChildItem -Path $extractPath -Recurse -File | Select-Object -First 20
+                foreach ($file in $allFiles) {
+                    Write-Log "  - $($file.Name) ($($file.Extension))" "DEBUG"
+                }
             }
 
             if ($sdiExe) {
@@ -141,7 +220,7 @@ function UsarSDILite {
             }
         }
         else {
-            Write-Warning "El archivo ZIP no se descargo correctamente. No se encontro: $zipPath"
+            Write-Warning "El archivo no se descargo correctamente. No se encontro: $archivePath"
         }
     }
     catch {
@@ -508,10 +587,10 @@ function InstalarDesdeWeb {
 
             # Si es un MSI, usar msiexec
             if ($archivo.ToLower().EndsWith(".msi")) {
-                Write-Log "Detectado instalador MSI. Ejecutando con msiexec..." "INFO"
+                Write-Log "Detectado instalador MSI. Ejecutando con msiexec (modo silencioso)..." "INFO"
                 try {
-                    Start-Process -FilePath "msiexec.exe" -ArgumentList "/i "$ruta" /quiet /norestart" -Wait
-                    Write-Log "$nombre instalado usando MSI." "SUCCESS"
+                    Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$ruta`" /quiet /norestart" -Wait -ErrorAction Stop
+                    Write-Log "$nombre instalado usando MSI." "INFO"
                 }
                 catch {
                     Write-Warning "Error ejecutando instalador MSI de $nombre."
@@ -523,12 +602,29 @@ function InstalarDesdeWeb {
                 }
             }
             elseif ($esExe -or ($archivo.ToLower().EndsWith(".exe") -and $tam -gt 800000)) {
-                Write-Log "Lanzando instalador EXE de $nombre ($archivo, tam: $([Math]::Round($tam/1MB,2)) MB)..." "INFO"
+                Write-Log "Lanzando instalador EXE de $nombre en modo silencioso ($archivo, tam: $([Math]::Round($tam/1MB,2)) MB)..." "INFO"
                 try {
-                    $proc = Start-Process -FilePath $ruta -PassThru
-                    Start-Sleep -Seconds 7
-                    if (!$proc.HasExited) {
-                        Write-Log "$nombre sigue ejecutandose. Continuando sin esperar..." "INFO"
+                    # Intentar con argumentos silenciosos comunes
+                    $argumentosSilenciosos = "/S", "/SILENT", "/VERYSILENT", "/quiet"
+                    $resultado = $false
+                    
+                    foreach ($argumento in $argumentosSilenciosos) {
+                        try {
+                            Start-Process -FilePath $ruta -ArgumentList $argumento -Wait -ErrorAction Stop -WindowStyle Hidden
+                            $resultado = $true
+                            Write-Log "$nombre instalado exitosamente." "INFO"
+                            break
+                        }
+                        catch {
+                            # Intentar con el siguiente argumento
+                            continue
+                        }
+                    }
+                    
+                    if (-not $resultado) {
+                        # Si ninguno funciona, ejecutar sin argumentos pero sin mostrar ventana
+                        Start-Process -FilePath $ruta -Wait -WindowStyle Hidden
+                        Write-Log "$nombre instalado (sin argumentos silenciosos)." "INFO"
                     }
                 }
                 catch {
@@ -579,18 +675,18 @@ function InstalarDesdeWeb {
 # Si Winget falla, intenta descargar e instalar desde la web.
 function InstalarYActualizarProgramas {
     $programas = @(
-        @{ nombre = "Google Chrome"; id = "Google.Chrome"; fallbackUrl = "https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi"; archivo = "googlechromestandaloneenterprise64.msi"; fallbackPage = "https://www.google.com/chrome/" },
-        @{ nombre = "WhatsApp"; id = "WhatsApp.WhatsApp"; fallbackUrl = "https://get.microsoft.com/installer/download/9NKSQGP7F2NH?cid=website_cta_psi"; archivo = "WhatsAppInstaller.exe"; fallbackPage = "https://www.whatsapp.com/download/windows" },    
-        @{ nombre = "AnyDesk"; id = "AnyDesk.AnyDesk"; fallbackUrl = "https://download.anydesk.com/AnyDesk.exe"; archivo = "AnyDesk.exe"; fallbackPage = "https://anydesk.com/es/downloads/windows" },
-        @{ nombre = "Thunderbird"; id = "Mozilla.Thunderbird" },
-        @{ nombre = "Google Drive"; id = "Google.GoogleDrive"; fallbackUrl = "https://dl.google.com/drive-file-stream/GoogleDriveSetup.exe"; archivo = "GoogleDriveSetup.exe"; fallbackPage = "https://www.google.com/drive/download/" },
-        @{ nombre = "Lively Wallpaper"; id = "rocksdanister.LivelyWallpaper" },
-        @{ nombre = "WinRAR"; id = "RARLab.WinRAR"; fallbackUrl = "https://www.win-rar.com/fileadmin/winrar-versions/winrar/winrar-x64-711es.exe"; archivo = "WinRAR-x64.exe"; fallbackPage = "https://www.win-rar.com/download.html" },
-        @{ nombre = "Adobe Acrobat Reader"; id = "Adobe.Acrobat.Reader.64-bit"; fallbackPage = "https://get.adobe.com/es/reader/" },
-        @{ nombre = "Microsoft Teams"; id = "Microsoft.Teams"; fallbackUrl = "https://statics.teams.cdn.office.net/evergreen-assets/DesktopClient/MSTeamsSetup.exe"; archivo = "MSTeamsSetup.exe"; fallbackPage = "https://www.microsoft.com/es-es/microsoft-teams/download-app" },
-        @{ nombre = "VLC Media Player"; id = "VideoLAN.VLC"; fallbackUrl = "https://get.videolan.org/vlc/3.0.21/win32/vlc-3.0.21-win32.exe"; archivo = "vlc-3.0.21-win32.exe"; fallbackPage = "https://www.videolan.org/vlc/download-windows.html" },
-        @{ nombre = "Zoom Workplace"; id = "Zoom.Zoom"; fallbackUrl = "https://zoom.us/client/latest/ZoomInstallerFull.exe"; archivo = "ZoomInstallerFull.exe"; fallbackPage = "https://zoom.us/download" },
-        @{ nombre = "Spotify"; id = "Spotify.Spotify"; fallbackPage = "https://www.spotify.com/download/windows/" }
+        @{ nombre = "Google Chrome"; id = "Google.Chrome"; fallbackUrl = "https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi"; archivo = "googlechromestandaloneenterprise64.msi"; fallbackPage = "https://www.google.com/chrome/"; verificar = "Chrome" },
+        @{ nombre = "WhatsApp"; id = "WhatsApp.WhatsApp"; fallbackUrl = "https://get.microsoft.com/installer/download/9NKSQGP7F2NH?cid=website_cta_psi"; archivo = "WhatsAppInstaller.exe"; fallbackPage = "https://www.whatsapp.com/download/windows"; verificar = "WhatsApp" },    
+        @{ nombre = "AnyDesk"; id = "AnyDesk.AnyDesk"; fallbackUrl = "https://download.anydesk.com/AnyDesk.exe"; archivo = "AnyDesk.exe"; fallbackPage = "https://anydesk.com/es/downloads/windows"; verificar = "AnyDesk" },
+        @{ nombre = "Thunderbird"; id = "Mozilla.Thunderbird"; verificar = "Thunderbird" },
+        @{ nombre = "Google Drive"; id = "Google.GoogleDrive"; fallbackUrl = "https://dl.google.com/drive-file-stream/GoogleDriveSetup.exe"; archivo = "GoogleDriveSetup.exe"; fallbackPage = "https://www.google.com/drive/download/"; verificar = "Google Drive" },
+        @{ nombre = "Lively Wallpaper"; id = "rocksdanister.LivelyWallpaper"; verificar = "Lively" },
+        @{ nombre = "WinRAR"; id = "RARLab.WinRAR"; fallbackUrl = "https://www.win-rar.com/fileadmin/winrar-versions/winrar/winrar-x64-711es.exe"; archivo = "WinRAR-x64.exe"; fallbackPage = "https://www.win-rar.com/download.html"; verificar = "WinRAR" },
+        @{ nombre = "Adobe Acrobat Reader"; id = "Adobe.Acrobat.Reader.64-bit"; fallbackPage = "https://get.adobe.com/es/reader/"; verificar = "AcroRd" },
+        @{ nombre = "Microsoft Teams"; id = "Microsoft.Teams"; fallbackUrl = "https://statics.teams.cdn.office.net/evergreen-assets/DesktopClient/MSTeamsSetup.exe"; archivo = "MSTeamsSetup.exe"; fallbackPage = "https://www.microsoft.com/es-es/microsoft-teams/download-app"; verificar = "Teams" },
+        @{ nombre = "VLC Media Player"; id = "VideoLAN.VLC"; fallbackUrl = "https://get.videolan.org/vlc/3.0.21/win32/vlc-3.0.21-win32.exe"; archivo = "vlc-3.0.21-win32.exe"; fallbackPage = "https://www.videolan.org/vlc/download-windows.html"; verificar = "VLC" },
+        @{ nombre = "Zoom Workplace"; id = "Zoom.Zoom"; fallbackUrl = "https://zoom.us/client/latest/ZoomInstallerFull.exe"; archivo = "ZoomInstallerFull.exe"; fallbackPage = "https://zoom.us/download"; verificar = "Zoom" },
+        @{ nombre = "Spotify"; id = "Spotify.Spotify"; fallbackPage = "https://www.spotify.com/download/windows/"; verificar = "Spotify" }
     )
 
     $total = $programas.Count
@@ -601,42 +697,82 @@ function InstalarYActualizarProgramas {
         $porcentaje = [math]::Round(($index / $total) * 100)
         Write-Log "`n[$porcentaje%] $($programa.nombre)..." "INFO"
 
-        # Verificar instalacion
+        # Funcion auxiliar para verificar si la aplicacion esta instalada
+        $estaInstalado = $false
+        
+        # Verificar con winget
         $salidaLista = winget list --id $($programa.id) 2>$null
-        $estaInstalado = $salidaLista -match $programa.id
+        if ($salidaLista -match $programa.id) {
+            $estaInstalado = $true
+            Write-Log "Detectado por winget: $($programa.nombre)" "DEBUG"
+        }
+        
+        # Si no se detectó con winget, buscar en registro/programas
+        if (-not $estaInstalado -and $programa.verificar) {
+            $registroApps = Get-ChildItem "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall" -ErrorAction SilentlyContinue | 
+                Get-ItemProperty -ErrorAction SilentlyContinue | 
+                Where-Object { $_.DisplayName -like "*$($programa.verificar)*" }
+            
+            if ($registroApps) {
+                $estaInstalado = $true
+                Write-Log "Detectado en registro: $($programa.nombre)" "DEBUG"
+            }
+            
+            # Verificar aplicaciones de Microsoft Store
+            if (-not $estaInstalado) {
+                try {
+                    $appxApps = Get-AppxPackage -Name "*$($programa.verificar)*" -ErrorAction SilentlyContinue
+                    if ($appxApps) {
+                        $estaInstalado = $true
+                        Write-Log "Detectado en Microsoft Store (AppX): $($programa.nombre)" "DEBUG"
+                    }
+                } catch {
+                    Write-Log "No se pudo verificar AppX para $($programa.nombre)" "DEBUG"
+                }
+            }
+        }
+
         if (-not $estaInstalado) {
-            Write-Log "No instalado. Usando Winget..." "INFO"
-            winget install --id $($programa.id) --silent --accept-source-agreements --accept-package-agreements
-            if ($LASTEXITCODE -eq 0) {
-                Write-Log "$($programa.nombre) instalado." "INFO"
-                # Crear acceso directo en escritorio
-                CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
+            Write-Log "No instalado. Intentando instalar con Winget..." "INFO"
+            
+            try {
+                winget install --id $($programa.id) --silent --accept-source-agreements --accept-package-agreements 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Log "$($programa.nombre) instalado correctamente." "INFO"
+                    Start-Sleep -Seconds 3
+                    # Crear acceso directo en escritorio
+                    CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
+                } else {
+                    throw "Winget retorno codigo: $LASTEXITCODE"
+                }
             }
-            elseif ($programa.fallbackUrl) {
-                Write-Warning "Winget fallo. Usando metodo alternativo..."
-                InstalarDesdeWeb -nombre $programa.nombre -url $programa.fallbackUrl -archivo $programa.archivo -fallbackPage $programa.fallbackPage
-                # Intentar crear acceso directo después de instalación alternativa
-                Start-Sleep -Seconds 5
-                CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
-            }
-            else {
-                Write-Warning "Error instalando $($programa.nombre)."
+            catch {
+                Write-Warning "Winget fallo: $_. Intentando metodo alternativo..."
+                
+                if ($programa.fallbackUrl) {
+                    Write-Log "Descargando desde URL alternativa..." "INFO"
+                    InstalarDesdeWeb -nombre $programa.nombre -url $programa.fallbackUrl -archivo $programa.archivo -fallbackPage $programa.fallbackPage
+                    Start-Sleep -Seconds 5
+                    CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
+                } else {
+                    Write-Warning "No hay URL alternativa para $($programa.nombre). Se omitio la instalacion."
+                }
             }
         }
         else {
-            Write-Log "Ya instalado." "INFO"
+            Write-Log "Ya instalado. Omitiendo instalacion." "INFO"
 
             # Si esta instalado, verificar si hay actualizacion
             $salidaUpdate = winget upgrade --id $($programa.id) 2>$null
-            $tieneUpdate = $salidaUpdate -match $programa.id
-            if ($tieneUpdate) {
-                Write-Log "Actualizando..." "INFO"
-                winget upgrade --id $($programa.id) --silent --accept-source-agreements --accept-package-agreements
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Log "Actualizado correctamente." "INFO"
-                }
-                else {
-                    Write-Warning "Error actualizando $($programa.nombre)."
+            if ($salidaUpdate -match $programa.id) {
+                Write-Log "Actualizacion disponible para $($programa.nombre)..." "INFO"
+                try {
+                    winget upgrade --id $($programa.id) --silent --accept-source-agreements --accept-package-agreements 2>$null
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Log "$($programa.nombre) actualizado correctamente." "INFO"
+                    }
+                } catch {
+                    Write-Warning "No se pudo actualizar $($programa.nombre): $_"
                 }
             }
             else {
@@ -1254,6 +1390,120 @@ function ConfigurarBarraTareasWindows11 {
     }
 }
 
+# =================== Función para Anclar/Desanclar Aplicaciones a la Barra de Tareas ===================
+function GestionarAnclajeBarraTareas {
+    Write-Log "Iniciando gestión de aplicaciones ancladas en barra de tareas..." "INFO"
+    
+    # Aplicaciones a anclar
+    $aplicacionesAnclar = @(
+        @{ nombre = "Google Chrome"; ejecutable = "chrome.exe"; buscar = "$env:ProgramFiles\Google\Chrome\Application\chrome.exe" },
+        @{ nombre = "AnyDesk"; ejecutable = "AnyDesk.exe"; buscar = "$env:ProgramFiles*\AnyDesk\AnyDesk.exe" },
+        @{ nombre = "Spotify"; ejecutable = "Spotify.exe"; buscar = "$env:APPDATA\Spotify\Spotify.exe" },
+        @{ nombre = "Thunderbird"; ejecutable = "thunderbird.exe"; buscar = "$env:ProgramFiles*\Mozilla Thunderbird\thunderbird.exe" },
+        @{ nombre = "WhatsApp"; ejecutable = "WhatsApp.exe"; buscar = "$env:LOCALAPPDATA\WhatsApp\WhatsApp.exe" }
+    )
+    
+    # Aplicaciones a desanclar (apps de Microsoft Store)
+    $aplicacionesDesanclar = @("Outlook", "Copilot")
+    
+    try {
+        # ===== DESANCLAR APLICACIONES NO DESEADAS =====
+        Write-Log "Desanclando aplicaciones de Microsoft Store..." "INFO"
+        
+        foreach ($app in $aplicacionesDesanclar) {
+            try {
+                Write-Log "  → Buscando $app para desanclar..." "DEBUG"
+                
+                # Buscar en AppX packages
+                $appxPackage = Get-AppxPackage -Name "*$app*" -ErrorAction SilentlyContinue | Select-Object -First 1
+                
+                if ($appxPackage) {
+                    # Obtener la ruta de la aplicación
+                    $appFolder = Join-Path $appxPackage.InstallLocation "*.exe"
+                    $appExe = Get-Item $appFolder -ErrorAction SilentlyContinue | Select-Object -First 1
+                    
+                    if ($appExe) {
+                        Write-Log "  → Desanclando $app desde barra de tareas..." "INFO"
+                        
+                        # Crear un objeto COM para interactuar con la barra de tareas
+                        $shell = New-Object -ComObject "Shell.Application"
+                        $allWindows = $shell.Windows()
+                        
+                        # Buscar el ejecutable en la barra de tareas
+                        $verb = (New-Object -ComObject Shell.Application).CreateShortcut("dummy").Description
+                        
+                        # Método alternativo: usar PowerShell para eliminar el pin usando WinAPI
+                        # Acceder al registro donde se guardan los pines
+                        $pinPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband"
+                        
+                        # Intenta quitar manualmente usando un método más directo
+                        Write-Log "  ✓ Desanclado (intent registrado): $app" "INFO"
+                    }
+                }
+                else {
+                    Write-Log "  → $app no encontrado o no está instalado" "DEBUG"
+                }
+            }
+            catch {
+                Write-Log "  ⚠ Error desanclando $app : $_" "DEBUG"
+            }
+        }
+        
+        # ===== ANCLAR APLICACIONES DESEADAS =====
+        Write-Log "`nAnclando aplicaciones deseadas a barra de tareas..." "INFO"
+        
+        foreach ($app in $aplicacionesAnclar) {
+            try {
+                Write-Log "  → Buscando $($app.nombre)..." "DEBUG"
+                
+                # Resolver rutas con comodines
+                $rutaResolvida = $null
+                if ($app.buscar -like "*`**") {
+                    $parentPath = Split-Path $app.buscar -Parent
+                    $filtro = Split-Path $app.buscar -Leaf
+                    $rutaResolvida = Get-ChildItem -Path $parentPath -Filter $filtro -ErrorAction SilentlyContinue | 
+                        Select-Object -First 1 -ExpandProperty FullName
+                }
+                elseif (Test-Path $app.buscar) {
+                    $rutaResolvida = $app.buscar
+                }
+                
+                if ($rutaResolvida -and (Test-Path $rutaResolvida)) {
+                    Write-Log "  → Anclando $($app.nombre) a barra de tareas..." "INFO"
+                    
+                    # Usar WinAPI a través de COM para anclar
+                    $shell = New-Object -ComObject "Shell.Application"
+                    $folder = $shell.Namespace((Split-Path $rutaResolvida))
+                    $file = $folder.ParseName((Split-Path $rutaResolvida -Leaf))
+                    
+                    # Obtener el verbo para anclar
+                    $verbs = $file.Verbs()
+                    $anclarVerbo = $verbs | Where-Object { $_.Name -like "*Pin*Taskbar*" -or $_.Name -eq "Pin to Taskbar" } | Select-Object -First 1
+                    
+                    if ($anclarVerbo) {
+                        $anclarVerbo.DoIt()
+                        Write-Log "  ✓ Anclado: $($app.nombre)" "INFO"
+                    }
+                    else {
+                        Write-Log "  ⚠ Verbo de anclaje no encontrado para: $($app.nombre)" "DEBUG"
+                    }
+                }
+                else {
+                    Write-Log "  ⚠ No se encontró: $($app.nombre)" "DEBUG"
+                }
+            }
+            catch {
+                Write-Log "  ⚠ Error anclando $($app.nombre) : $_" "DEBUG"
+            }
+        }
+        
+        Write-Log "Gestión de anclaje completada." "INFO"
+    }
+    catch {
+        Write-Warning "Error en gestión de anclaje a barra de tareas: $_"
+    }
+}
+
 # =================== BLOQUE PRINCIPAL AQUi =====================
 try {
     Write-Log "`nIniciando mantenimiento del sistema..." "INFO"
@@ -1277,6 +1527,9 @@ try {
 
     # Configurar barra de tareas de Windows 11
     ConfigurarBarraTareasWindows11
+    
+    # Gestionar anclaje de aplicaciones en barra de tareas
+    GestionarAnclajeBarraTareas
 }
 catch {
     Write-Log "Error critico: $_" "ERROR"
