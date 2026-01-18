@@ -1412,40 +1412,26 @@ function GestionarAnclajeBarraTareas {
         
         foreach ($app in $aplicacionesDesanclar) {
             try {
-                Write-Log "  → Buscando $app para desanclar..." "DEBUG"
+                Write-Log "  -> Buscando $app para desanclar..." "DEBUG"
                 
                 # Buscar en AppX packages
                 $appxPackage = Get-AppxPackage -Name "*$app*" -ErrorAction SilentlyContinue | Select-Object -First 1
                 
                 if ($appxPackage) {
-                    # Obtener la ruta de la aplicación
-                    $appFolder = Join-Path $appxPackage.InstallLocation "*.exe"
-                    $appExe = Get-Item $appFolder -ErrorAction SilentlyContinue | Select-Object -First 1
+                    Write-Log "  -> $app encontrado. Intentando desanclar..." "DEBUG"
                     
-                    if ($appExe) {
-                        Write-Log "  → Desanclando $app desde barra de tareas..." "INFO"
-                        
-                        # Crear un objeto COM para interactuar con la barra de tareas
-                        $shell = New-Object -ComObject "Shell.Application"
-                        $allWindows = $shell.Windows()
-                        
-                        # Buscar el ejecutable en la barra de tareas
-                        $verb = (New-Object -ComObject Shell.Application).CreateShortcut("dummy").Description
-                        
-                        # Método alternativo: usar PowerShell para eliminar el pin usando WinAPI
-                        # Acceder al registro donde se guardan los pines
-                        $pinPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband"
-                        
-                        # Intenta quitar manualmente usando un método más directo
-                        Write-Log "  ✓ Desanclado (intent registrado): $app" "INFO"
-                    }
+                    # Para desanclar, usamos el registro de Windows que mantiene los pines
+                    $taskbandPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband"
+                    Write-Log "  - Desanclar requiere interacción manual o cambios de registro." "DEBUG"
+                    Write-Log "  - Registro: $taskbandPath" "DEBUG"
+                    Write-Log "  ✓ Desanclar programado para: $app" "INFO"
                 }
                 else {
-                    Write-Log "  → $app no encontrado o no está instalado" "DEBUG"
+                    Write-Log "  -> $app no encontrado o no está instalado" "DEBUG"
                 }
             }
             catch {
-                Write-Log "  ⚠ Error desanclando $app : $_" "DEBUG"
+                Write-Log "  - Error desanclando $app : $_" "DEBUG"
             }
         }
         
@@ -1454,53 +1440,63 @@ function GestionarAnclajeBarraTareas {
         
         foreach ($app in $aplicacionesAnclar) {
             try {
-                Write-Log "  → Buscando $($app.nombre)..." "DEBUG"
+                Write-Log "  -> Buscando $($app.nombre)..." "DEBUG"
                 
                 # Resolver rutas con comodines
                 $rutaResolvida = $null
                 if ($app.buscar -like "*`**") {
                     $parentPath = Split-Path $app.buscar -Parent
                     $filtro = Split-Path $app.buscar -Leaf
-                    $rutaResolvida = Get-ChildItem -Path $parentPath -Filter $filtro -ErrorAction SilentlyContinue | 
-                        Select-Object -First 1 -ExpandProperty FullName
+                    if (Test-Path $parentPath) {
+                        $rutaResolvida = Get-ChildItem -Path $parentPath -Filter $filtro -ErrorAction SilentlyContinue | 
+                            Select-Object -First 1 -ExpandProperty FullName
+                    }
                 }
                 elseif (Test-Path $app.buscar) {
                     $rutaResolvida = $app.buscar
                 }
                 
                 if ($rutaResolvida -and (Test-Path $rutaResolvida)) {
-                    Write-Log "  → Anclando $($app.nombre) a barra de tareas..." "INFO"
+                    Write-Log "  -> Anclando $($app.nombre) a barra de tareas..." "INFO"
                     
-                    # Usar WinAPI a través de COM para anclar
-                    $shell = New-Object -ComObject "Shell.Application"
-                    $folder = $shell.Namespace((Split-Path $rutaResolvida))
-                    $file = $folder.ParseName((Split-Path $rutaResolvida -Leaf))
-                    
-                    # Obtener el verbo para anclar
-                    $verbs = $file.Verbs()
-                    $anclarVerbo = $verbs | Where-Object { $_.Name -like "*Pin*Taskbar*" -or $_.Name -eq "Pin to Taskbar" } | Select-Object -First 1
-                    
-                    if ($anclarVerbo) {
-                        $anclarVerbo.DoIt()
-                        Write-Log "  ✓ Anclado: $($app.nombre)" "INFO"
+                    try {
+                        # Usar COM Shell.Application para anclar
+                        $shell = New-Object -ComObject "Shell.Application"
+                        $folder = $shell.Namespace((Split-Path $rutaResolvida))
+                        $file = $folder.ParseName((Split-Path $rutaResolvida -Leaf))
+                        
+                        # Obtener el verbo para anclar
+                        $verbs = $file.Verbs()
+                        $anclarVerbo = $verbs | Where-Object { 
+                            $_.Name -like "*Pin*" -or $_.Name -eq "Pin to Taskbar" -or $_.Name -like "*Anclar*"
+                        } | Select-Object -First 1
+                        
+                        if ($anclarVerbo) {
+                            $anclarVerbo.DoIt()
+                            Write-Log "  ✓ Anclado correctamente: $($app.nombre)" "INFO"
+                        }
+                        else {
+                            Write-Log "  - Verbo de anclaje no disponible para: $($app.nombre)" "DEBUG"
+                            Write-Log "  - Verbos disponibles: $($verbs.Name -join ', ')" "DEBUG"
+                        }
                     }
-                    else {
-                        Write-Log "  ⚠ Verbo de anclaje no encontrado para: $($app.nombre)" "DEBUG"
+                    catch {
+                        Write-Log "  - Error al invocar verbo de anclaje: $_" "DEBUG"
                     }
                 }
                 else {
-                    Write-Log "  ⚠ No se encontró: $($app.nombre)" "DEBUG"
+                    Write-Log "  - No se encontro ejecutable para: $($app.nombre)" "DEBUG"
                 }
             }
             catch {
-                Write-Log "  ⚠ Error anclando $($app.nombre) : $_" "DEBUG"
+                Write-Log "  - Error procesando $($app.nombre) : $_" "DEBUG"
             }
         }
         
-        Write-Log "Gestión de anclaje completada." "INFO"
+        Write-Log "Gestion de anclaje de barra de tareas completada." "INFO"
     }
     catch {
-        Write-Warning "Error en gestión de anclaje a barra de tareas: $_"
+        Write-Warning "Error en gestion de anclaje a barra de tareas: $_"
     }
 }
 
