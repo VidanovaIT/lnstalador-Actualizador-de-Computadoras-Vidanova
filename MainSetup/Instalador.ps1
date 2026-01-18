@@ -678,7 +678,7 @@ function InstalarYActualizarProgramas {
         @{ nombre = "Google Chrome"; id = "Google.Chrome"; fallbackUrl = "https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi"; archivo = "googlechromestandaloneenterprise64.msi"; fallbackPage = "https://www.google.com/chrome/"; verificar = "Chrome" },
         @{ nombre = "WhatsApp"; id = "WhatsApp.WhatsApp"; fallbackUrl = "https://get.microsoft.com/installer/download/9NKSQGP7F2NH?cid=website_cta_psi"; archivo = "WhatsAppInstaller.exe"; fallbackPage = "https://www.whatsapp.com/download/windows"; verificar = "WhatsApp" },    
         @{ nombre = "AnyDesk"; id = "AnyDesk.AnyDesk"; fallbackUrl = "https://download.anydesk.com/AnyDesk.exe"; archivo = "AnyDesk.exe"; fallbackPage = "https://anydesk.com/es/downloads/windows"; verificar = "AnyDesk" },
-        @{ nombre = "Thunderbird"; id = "Mozilla.Thunderbird"; verificar = "Thunderbird" },
+        @{ nombre = "Thunderbird"; id = "Mozilla.Thunderbird"; fallbackUrl = "https://download.mozilla.org/?product=thunderbird-latest-ssl&os=win64&lang=es-ES"; archivo = "ThunderbirdSetup.exe"; fallbackPage = "https://www.thunderbird.net/es-ES/download/"; verificar = "Thunderbird" },
         @{ nombre = "Google Drive"; id = "Google.GoogleDrive"; fallbackUrl = "https://dl.google.com/drive-file-stream/GoogleDriveSetup.exe"; archivo = "GoogleDriveSetup.exe"; fallbackPage = "https://www.google.com/drive/download/"; verificar = "Google Drive" },
         @{ nombre = "Lively Wallpaper"; id = "rocksdanister.LivelyWallpaper"; verificar = "Lively" },
         @{ nombre = "WinRAR"; id = "RARLab.WinRAR"; fallbackUrl = "https://www.win-rar.com/fileadmin/winrar-versions/winrar/winrar-x64-711es.exe"; archivo = "WinRAR-x64.exe"; fallbackPage = "https://www.win-rar.com/download.html"; verificar = "WinRAR" },
@@ -686,7 +686,7 @@ function InstalarYActualizarProgramas {
         @{ nombre = "Microsoft Teams"; id = "Microsoft.Teams"; fallbackUrl = "https://statics.teams.cdn.office.net/evergreen-assets/DesktopClient/MSTeamsSetup.exe"; archivo = "MSTeamsSetup.exe"; fallbackPage = "https://www.microsoft.com/es-es/microsoft-teams/download-app"; verificar = "Teams" },
         @{ nombre = "VLC Media Player"; id = "VideoLAN.VLC"; fallbackUrl = "https://get.videolan.org/vlc/3.0.21/win32/vlc-3.0.21-win32.exe"; archivo = "vlc-3.0.21-win32.exe"; fallbackPage = "https://www.videolan.org/vlc/download-windows.html"; verificar = "VLC" },
         @{ nombre = "Zoom Workplace"; id = "Zoom.Zoom"; fallbackUrl = "https://zoom.us/client/latest/ZoomInstallerFull.exe"; archivo = "ZoomInstallerFull.exe"; fallbackPage = "https://zoom.us/download"; verificar = "Zoom" },
-        @{ nombre = "Spotify"; id = "Spotify.Spotify"; fallbackPage = "https://www.spotify.com/download/windows/"; verificar = "Spotify" }
+        @{ nombre = "Spotify"; id = "Spotify.Spotify"; fallbackUrl = "https://download.scdn.co/SpotifySetup.exe"; archivo = "SpotifySetup.exe"; fallbackPage = "https://www.spotify.com/download/windows/"; verificar = "Spotify" }
     )
 
     $total = $programas.Count
@@ -1292,6 +1292,9 @@ function ConfigurarBarraTareasWindows11 {
         
         $regPathExplorer = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
         $regPathSearch = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search"
+        $regPathFeeds = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds"
+        $regPolicyDsh = "HKLM:\SOFTWARE\Policies\Microsoft\Dsh"
+        $regPathCopilot = "HKCU:\Software\Microsoft\Windows\Shell\Copilot"
         
         # Asegurar que las rutas del registro existan
         if (-not (Test-Path $regPathExplorer)) {
@@ -1299,6 +1302,15 @@ function ConfigurarBarraTareasWindows11 {
         }
         if (-not (Test-Path $regPathSearch)) {
             New-Item -Path $regPathSearch -Force | Out-Null
+        }
+        if (-not (Test-Path $regPathFeeds)) {
+            New-Item -Path $regPathFeeds -Force | Out-Null
+        }
+        if (-not (Test-Path $regPolicyDsh)) {
+            New-Item -Path $regPolicyDsh -Force | Out-Null
+        }
+        if (-not (Test-Path $regPathCopilot)) {
+            New-Item -Path $regPathCopilot -Force | Out-Null
         }
         
         $cambiosAplicados = $false
@@ -1341,6 +1353,10 @@ function ConfigurarBarraTareasWindows11 {
             if ($valorActual -ne 0) {
                 Write-Log "→ Ocultando Widgets y Noticias..." "INFO"
                 Set-ItemProperty -Path $regPathExplorer -Name "TaskbarDa" -Value 0 -Type DWord -Force -ErrorAction Stop
+                # Extras para asegurar desactivacion
+                New-ItemProperty -Path $regPathFeeds -Name "ShellFeedsTaskbarOpenOnHover" -Value 0 -PropertyType DWord -Force | Out-Null
+                New-ItemProperty -Path $regPathFeeds -Name "FeedsTaskbarEnabled" -Value 0 -PropertyType DWord -Force | Out-Null
+                New-ItemProperty -Path $regPolicyDsh -Name "AllowNewsAndInterests" -Value 0 -PropertyType DWord -Force | Out-Null
                 $cambiosAplicados = $true
             }
             else {
@@ -1365,6 +1381,18 @@ function ConfigurarBarraTareasWindows11 {
         }
         catch {
             Write-Warning "Error al configurar búsqueda: $_"
+        }
+
+        # 5. Ocultar boton Copilot si existe
+        try {
+            Write-Log "Ocultando boton de Copilot si aplica..." "INFO"
+            New-ItemProperty -Path $regPathExplorer -Name "ShowCopilotButton" -Value 0 -PropertyType DWord -Force | Out-Null
+            New-ItemProperty -Path $regPathExplorer -Name "TaskbarCopilot" -Value 0 -PropertyType DWord -Force | Out-Null
+            New-ItemProperty -Path $regPathCopilot -Name "IsCopilotVisible" -Value 0 -PropertyType DWord -Force | Out-Null
+            $cambiosAplicados = $true
+        }
+        catch {
+            Write-Log "No se pudo ocultar Copilot automaticamente: $_" "WARNING"
         }
         
         # 5. Reiniciar el Explorador de Windows solo si hubo cambios
@@ -1393,85 +1421,136 @@ function ConfigurarBarraTareasWindows11 {
 # =================== Funcion para Anclar/Desanclar Aplicaciones a la Barra de Tareas ===================
 function GestionarAnclajeBarraTareas {
     Write-Log "Iniciando gestion de aplicaciones ancladas en barra de tareas..." "INFO"
-    
-    # Aplicaciones a anclar
-    $aplicacionesAnclar = @(
-        @{ nombre = "Google Chrome"; ejecutable = "chrome.exe"; buscar = "$env:ProgramFiles\Google\Chrome\Application\chrome.exe" },
-        @{ nombre = "AnyDesk"; ejecutable = "AnyDesk.exe"; buscar = "$env:ProgramFiles*\AnyDesk\AnyDesk.exe" },
-        @{ nombre = "Spotify"; ejecutable = "Spotify.exe"; buscar = "$env:APPDATA\Spotify\Spotify.exe" },
-        @{ nombre = "Thunderbird"; ejecutable = "thunderbird.exe"; buscar = "$env:ProgramFiles*\Mozilla Thunderbird\thunderbird.exe" },
-        @{ nombre = "WhatsApp"; ejecutable = "WhatsApp.exe"; buscar = "$env:LOCALAPPDATA\WhatsApp\WhatsApp.exe" }
+    $shell = New-Object -ComObject Shell.Application
+
+    # Buscar accesos directos del menu Inicio
+    $startMenuPaths = @(
+        "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs",
+        "$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs"
     )
-    
-    # Aplicaciones a desanclar (apps de Microsoft Store)
-    $aplicacionesDesanclar = @("Outlook", "Copilot")
-    
+
+    # Carpeta de aplicaciones UWP (AppsFolder)
+    $appsFolder = $shell.Namespace('shell:AppsFolder')
+
+    # Carpeta de elementos anclados actualmente (Win10/11 suele mantener .lnk aqui para Win32)
+    $taskbarPinnedPath = Join-Path $env:AppData "Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
+    $pinnedLinks = @()
+    if (Test-Path $taskbarPinnedPath) {
+        $pinnedLinks = Get-ChildItem -Path $taskbarPinnedPath -Filter *.lnk -ErrorAction SilentlyContinue
+    }
+
+    # Definir patrones de .lnk para apps a anclar
+    $aplicacionesAnclar = @(
+        @{ nombre = "Google Chrome"; patrones = @("*Google*Chrome*.lnk", "Chrome.lnk"); check = @("*Chrome*") },
+        @{ nombre = "AnyDesk"; patrones = @("*AnyDesk*.lnk"); check = @("*AnyDesk*") },
+        @{ nombre = "Spotify"; patrones = @("*Spotify*.lnk"); check = @("*Spotify*") },
+        @{ nombre = "Mozilla Thunderbird"; patrones = @("*Thunderbird*.lnk"); check = @("*Thunderbird*") },
+        @{ nombre = "WhatsApp"; patrones = @("*WhatsApp*.lnk"); check = @("*WhatsApp*") }
+    )
+
+    # Definir patrones para apps a desanclar
+    $aplicacionesDesanclar = @(
+        @{ nombre = "Microsoft Store"; patrones = @("*Microsoft Store*.lnk", "*Tienda*.lnk") },
+        @{ nombre = "Outlook"; patrones = @("*Outlook*.lnk") },
+        @{ nombre = "Copilot"; patrones = @("*Copilot*.lnk") }
+    )
+
     try {
         Write-Log "Desanclando aplicaciones no deseadas..." "INFO"
-        
-        foreach ($app in $aplicacionesDesanclar) {
-            try {
-                Write-Log "  - Buscando $app para desanclar..." "DEBUG"
-                $appxPackage = Get-AppxPackage -Name "*$app*" -ErrorAction SilentlyContinue | Select-Object -First 1
-                if ($appxPackage) {
-                    Write-Log "  - $app encontrado en Microsoft Store" "DEBUG"
+        foreach ($entry in $aplicacionesDesanclar) {
+            $lnkPath = $null
+            foreach ($base in $startMenuPaths) {
+                foreach ($pat in $entry.patrones) {
+                    $hit = Get-ChildItem -Path $base -Filter *.lnk -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -like $pat } | Select-Object -First 1
+                    if ($hit) { $lnkPath = $hit.FullName; break }
                 }
+                if ($lnkPath) { break }
             }
-            catch {
-                Write-Log "  - Error desanclando $app : $_" "DEBUG"
-            }
-        }
-        
-        Write-Log "Anclando aplicaciones deseadas..." "INFO"
-        
-        foreach ($app in $aplicacionesAnclar) {
-            try {
-                Write-Log "  - Buscando $($app.nombre)..." "DEBUG"
-                
-                $rutaResolvida = $null
-                if ($app.buscar -like "*`**") {
-                    $parentPath = Split-Path $app.buscar -Parent
-                    $filtro = Split-Path $app.buscar -Leaf
-                    if (Test-Path $parentPath) {
-                        $rutaResolvida = Get-ChildItem -Path $parentPath -Filter $filtro -ErrorAction SilentlyContinue | 
-                            Select-Object -First 1 -ExpandProperty FullName
+
+            if ($lnkPath) {
+                try {
+                    $folder = $shell.Namespace((Split-Path $lnkPath))
+                    $item   = $folder.ParseName((Split-Path $lnkPath -Leaf))
+                    try { $item.InvokeVerb('taskbarunpin') } catch {
+                        $verb = $item.Verbs() | Where-Object { $_.Name -match 'Desanclar|Quitar|Unpin' } | Select-Object -First 1
+                        if ($verb) { $verb.DoIt() }
                     }
+                    Write-Log "  - Desanclado: $($entry.nombre)" "INFO"
                 }
-                elseif (Test-Path $app.buscar) {
-                    $rutaResolvida = $app.buscar
-                }
-                
-                if ($rutaResolvida -and (Test-Path $rutaResolvida)) {
-                    Write-Log "  - Anclando $($app.nombre) a barra de tareas..." "INFO"
-                    
+                catch { Write-Log "  - Error desanclando $($entry.nombre): $_" "DEBUG" }
+            }
+            else {
+                # Intentar via AppsFolder (UWP)
+                $uwpItem = $appsFolder.Items() | Where-Object { $_.Name -like "$($entry.nombre)*" } | Select-Object -First 1
+                if ($uwpItem) {
                     try {
-                        $shell = New-Object -ComObject "Shell.Application"
-                        $folder = $shell.Namespace((Split-Path $rutaResolvida))
-                        $file = $folder.ParseName((Split-Path $rutaResolvida -Leaf))
-                        $verbs = $file.Verbs()
-                        $anclarVerbo = $verbs | Where-Object {$_.Name -like "*Pin*" -or $_.Name -eq "Pin to Taskbar"} | Select-Object -First 1
-                        
-                        if ($anclarVerbo) {
-                            $anclarVerbo.DoIt()
-                            Write-Log "  - OK Anclado: $($app.nombre)" "INFO"
-                        }
-                        else {
-                            Write-Log "  - Verbo de anclaje no disponible" "DEBUG"
-                        }
-                    }
-                    catch {
-                        Write-Log "  - Error al anclar: $_" "DEBUG"
-                    }
+                        $verb = $uwpItem.Verbs() | Where-Object { $_.Name -match 'Desanclar|Quitar|Unpin' } | Select-Object -First 1
+                        if ($verb) { $verb.DoIt(); Write-Log "  - Desanclado (UWP): $($entry.nombre)" "INFO" }
+                        else { Write-Log "  - Verbo de desanclaje no disponible (UWP): $($entry.nombre)" "DEBUG" }
+                    } catch { Write-Log "  - Error desanclando (UWP) $($entry.nombre): $_" "DEBUG" }
                 }
                 else {
-                    Write-Log "  - No se encontro: $($app.nombre)" "DEBUG"
+                    Write-Log "  - No se encontro acceso directo ni UWP para: $($entry.nombre)" "DEBUG"
                 }
             }
-            catch {
-                Write-Log "  - Error procesando $($app.nombre) : $_" "DEBUG"
+        }
+
+        Write-Log "Anclando aplicaciones deseadas..." "INFO"
+        foreach ($entry in $aplicacionesAnclar) {
+            $lnkPath = $null
+            # Verificar si ya esta anclado por nombre del .lnk
+            $yaAnclado = $false
+            if ($pinnedLinks -and $entry.check) {
+                foreach ($pattern in $entry.check) {
+                    $hit = $pinnedLinks | Where-Object { $_.Name -like $pattern } | Select-Object -First 1
+                    if ($hit) { $yaAnclado = $true; break }
+                }
+            }
+
+            if ($yaAnclado) {
+                Write-Log "  - Ya anclado: $($entry.nombre)" "DEBUG"
+                continue
+            }
+            foreach ($base in $startMenuPaths) {
+                foreach ($pat in $entry.patrones) {
+                    $hit = Get-ChildItem -Path $base -Filter *.lnk -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -like $pat } | Select-Object -First 1
+                    if ($hit) { $lnkPath = $hit.FullName; break }
+                }
+                if ($lnkPath) { break }
+            }
+
+            if ($lnkPath) {
+                try {
+                    Write-Log "  - Anclando $($entry.nombre) a barra de tareas..." "INFO"
+                    $folder = $shell.Namespace((Split-Path $lnkPath))
+                    $item   = $folder.ParseName((Split-Path $lnkPath -Leaf))
+                    try { $item.InvokeVerb('taskbarpin') } catch {
+                        $verb = $item.Verbs() | Where-Object { $_.Name -match 'Pin|Anclar' } | Select-Object -First 1
+                        if ($verb) { $verb.DoIt() } else { Write-Log "  - Verbo de anclaje no disponible" "DEBUG" }
+                    }
+                    # Actualizar cache de anclados
+                    if (Test-Path $taskbarPinnedPath) {
+                        $pinnedLinks = Get-ChildItem -Path $taskbarPinnedPath -Filter *.lnk -ErrorAction SilentlyContinue
+                    }
+                }
+                catch { Write-Log "  - Error anclando $($entry.nombre): $_" "DEBUG" }
+            }
+            else {
+                # Intentar via AppsFolder (UWP)
+                $uwpItem = $appsFolder.Items() | Where-Object { $_.Name -like "$($entry.nombre)*" } | Select-Object -First 1
+                if ($uwpItem) {
+                    try {
+                        $verb = $uwpItem.Verbs() | Where-Object { $_.Name -match 'Pin|Anclar' } | Select-Object -First 1
+                        if ($verb) { $verb.DoIt(); Write-Log "  - Anclado (UWP): $($entry.nombre)" "INFO" }
+                        else { Write-Log "  - Verbo de anclaje no disponible (UWP): $($entry.nombre)" "DEBUG" }
+                    } catch { Write-Log "  - Error anclando (UWP) $($entry.nombre): $_" "DEBUG" }
+                }
+                else {
+                    Write-Log "  - No se encontro: $($entry.nombre)" "DEBUG"
+                }
             }
         }
-        
+
         Write-Log "Gestion de anclaje completada." "INFO"
     }
     catch {
