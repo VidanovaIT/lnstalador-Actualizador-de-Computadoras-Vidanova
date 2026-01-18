@@ -1071,6 +1071,108 @@ function DescargarFondosYProtectorDePantalla {
     }
 }
 
+# =================== Funcion para Validar y Convertir Video a Formato Compatible ===================
+function ValidarYConvertirVideoLively {
+    param(
+        [string]$videoPath,
+        [string]$videoPathConverted = ""
+    )
+    
+    if (-not (Test-Path $videoPath)) {
+        Write-Log "Validacion: Video no encontrado en $videoPath" "WARNING"
+        return $videoPath
+    }
+    
+    if ([string]::IsNullOrEmpty($videoPathConverted)) {
+        $videoPathConverted = $videoPath -replace '\.mp4$', '_compatible.mp4'
+    }
+    
+    Write-Log "Validando compatibilidad del video para Lively..." "INFO"
+    
+    # Verificar si FFmpeg está instalado
+    $ffmpegPath = $null
+    $ffmpegPaths = @(
+        "ffmpeg.exe",
+        "$env:ProgramFiles\ffmpeg\bin\ffmpeg.exe",
+        "$env:ProgramFiles (x86)\ffmpeg\bin\ffmpeg.exe"
+    )
+    
+    foreach ($path in $ffmpegPaths) {
+        try {
+            if (Get-Command $path -ErrorAction SilentlyContinue) {
+                $ffmpegPath = $path
+                break
+            }
+        } catch { }
+    }
+    
+    # Si FFmpeg no está, intentar instalarlo
+    if (-not $ffmpegPath) {
+        Write-Log "FFmpeg no detectado. Intentando instalarlo con Winget..." "INFO"
+        try {
+            winget install --id Gyan.FFmpeg --silent --accept-source-agreements --accept-package-agreements 2>$null
+            Start-Sleep -Seconds 3
+            
+            if (Get-Command ffmpeg.exe -ErrorAction SilentlyContinue) {
+                $ffmpegPath = "ffmpeg.exe"
+                Write-Log "FFmpeg instalado correctamente." "INFO"
+            }
+        } catch {
+            Write-Log "No se pudo instalar FFmpeg automáticamente. Usando video original." "WARNING"
+            return $videoPath
+        }
+    }
+    
+    if (-not $ffmpegPath) {
+        Write-Log "FFmpeg no disponible. Usando video original (puede haber problemas)." "WARNING"
+        return $videoPath
+    }
+    
+    # Si el video convertido ya existe, usarlo
+    if (Test-Path $videoPathConverted) {
+        Write-Log "Video compatible ya existe: $videoPathConverted" "INFO"
+        return $videoPathConverted
+    }
+    
+    # Convertir video a formato compatible con Lively
+    Write-Log "Convertiendo video a formato compatible (H.264, 1920x1080, 30fps, 8Mbps)..." "INFO"
+    Write-Log "Esto puede tomar algunos minutos según el tamaño del video..." "INFO"
+    
+    try {
+        $ffmpegArgs = @(
+            "-i", "`"$videoPath`"",           # Input
+            "-c:v", "libx264",                # Video codec: H.264 (muy compatible)
+            "-preset", "fast",                # Velocidad: fast (balance calidad/tiempo)
+            "-crf", "23",                     # Quality (23 es bueno para screensavers)
+            "-s", "1920x1080",                # Resolución
+            "-r", "30",                       # Frame rate
+            "-b:v", "8M",                     # Video bitrate
+            "-c:a", "aac",                    # Audio codec
+            "-b:a", "128k",                   # Audio bitrate
+            "-y",                             # Sobrescribir sin preguntar
+            "`"$videoPathConverted`""         # Output
+        )
+        
+        & $ffmpegPath $ffmpegArgs 2>&1 | Out-Null
+        
+        if (Test-Path $videoPathConverted) {
+            $originalSize = (Get-Item $videoPath).Length / 1MB
+            $convertedSize = (Get-Item $videoPathConverted).Length / 1MB
+            Write-Log "✅ Video convertido exitosamente." "INFO"
+            Write-Log "  - Original: $([Math]::Round($originalSize, 2)) MB" "INFO"
+            Write-Log "  - Convertido: $([Math]::Round($convertedSize, 2)) MB" "INFO"
+            return $videoPathConverted
+        } else {
+            Write-Log "Error: FFmpeg no generó el archivo convertido." "WARNING"
+            return $videoPath
+        }
+    }
+    catch {
+        Write-Log "Error durante conversión: $_" "WARNING"
+        return $videoPath
+    }
+}
+
 # =================== Configura SOLO el protector de pantalla Lively ===================
 function ConfigurarLivelyProtectorYFondo {
     Write-Log "Iniciando configuración SOLO del protector de pantalla Lively..." "INFO"
@@ -1094,8 +1196,13 @@ function ConfigurarLivelyProtectorYFondo {
 
         # Rutas de archivos multimedia
         $videoPath = Join-Path ([Environment]::GetFolderPath("MyVideos")) "PROTECTOR-1.mp4"
+        $videoPathConverted = Join-Path ([Environment]::GetFolderPath("MyVideos")) "PROTECTOR-1_compatible.mp4"
         $fondoPath = Join-Path ([Environment]::GetFolderPath("MyPictures")) "Fondos\Fondo de Escritorio.png"
         $destScr   = "C:\Windows\Lively.scr"  # Ubicación correcta del screensaver
+
+        # Paso 0.5: Validar y convertir video si es necesario
+        Write-Log "Paso 0.5: Validando compatibilidad del video..." "INFO"
+        $videoPathFinal = ValidarYConvertirVideoLively -videoPath $videoPath -videoPathConverted $videoPathConverted
 
         # Paso 0: Establecer fondo de escritorio estático
         if (Test-Path $fondoPath) {
@@ -1109,8 +1216,8 @@ function ConfigurarLivelyProtectorYFondo {
         }
 
         # Paso 1: Validar video
-        if (-not (Test-Path $videoPath)) {
-            Write-Warning "No se encontró el video del protector en: $videoPath"
+        if (-not (Test-Path $videoPathFinal)) {
+            Write-Warning "No se encontró el video del protector en: $videoPathFinal"
             return
         }
 
@@ -1196,9 +1303,9 @@ function ConfigurarLivelyProtectorYFondo {
                         $videoWallpaperFolder = Join-Path $libraryPath "${uniqueId}.mp4"
                         New-Item -ItemType Directory -Path $videoWallpaperFolder -Force | Out-Null
                         
-                        # Copiar el video a la biblioteca
+                        # Copiar el video a la biblioteca (usar versión convertida si está disponible)
                         $videoDestInLibrary = Join-Path $videoWallpaperFolder "PROTECTOR-1.mp4"
-                        Copy-Item -Path $videoPath -Destination $videoDestInLibrary -Force
+                        Copy-Item -Path $videoPathFinal -Destination $videoDestInLibrary -Force
                         Write-Log "Paso 3.3: Video copiado a biblioteca: $videoWallpaperFolder" "INFO"
                     }
                     
@@ -1285,7 +1392,7 @@ function ConfigurarLivelyProtectorYFondo {
             }
         }
         else {
-            Write-Warning "Paso 3: Video no encontrado en $videoPath"
+            Write-Warning "Paso 3: Video no encontrado en $videoPathFinal"
         }
         
         # Paso 4: Verificar configuración (opcional - cerrar Lively si está abierto)
