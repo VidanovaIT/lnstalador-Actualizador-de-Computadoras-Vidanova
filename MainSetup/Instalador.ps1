@@ -98,7 +98,8 @@ function UsarSDILite {
             $latestFile = $matches[0].Groups[1].Value
             $latestUrl = "$downloadPage$latestFile"
             Write-Log "Enlace automatico encontrado: $latestUrl" "INFO"
-        } else {
+        }
+        else {
             # Si no se encuentra, usar el enlace directo conocido
             $latestUrl = "https://driveroff.net/drv/SDI_1.26.0.7z"
             Write-Log "Usando enlace directo: $latestUrl" "INFO"
@@ -129,10 +130,12 @@ function UsarSDILite {
                     # Verificar instalacion
                     if (Test-Path $7zipPath) {
                         Write-Log "7-Zip instalado correctamente con Winget." "INFO"
-                    } else {
+                    }
+                    else {
                         throw "Winget no instalo 7-Zip correctamente"
                     }
-                } catch {
+                }
+                catch {
                     Write-Log "Winget fallo, instalando 7-Zip manualmente..." "WARNING"
                     
                     # Descargar e instalar 7-Zip manualmente
@@ -146,7 +149,8 @@ function UsarSDILite {
                         
                         if (Test-Path $7zipPath) {
                             Write-Log "7-Zip instalado correctamente." "INFO"
-                        } else {
+                        }
+                        else {
                             Write-Warning "No se pudo instalar 7-Zip automaticamente."
                             Write-Warning "Por favor descargue e instale 7-Zip desde: https://www.7-zip.org/"
                             Read-Host "Presione ENTER despues de instalar 7-Zip para continuar"
@@ -156,7 +160,8 @@ function UsarSDILite {
                                 return
                             }
                         }
-                    } catch {
+                    }
+                    catch {
                         Write-Warning "Error instalando 7-Zip: $_"
                         return
                     }
@@ -168,7 +173,8 @@ function UsarSDILite {
             try {
                 & $7zipPath x "$archivePath" "-o$extractPath" -y | Out-Null
                 Write-Log "Extraccion completada. Buscando ejecutable..." "INFO"
-            } catch {
+            }
+            catch {
                 Write-Warning "Error al extraer archivo: $_"
                 return
             }
@@ -179,8 +185,8 @@ function UsarSDILite {
             
             foreach ($pattern in $patterns) {
                 $sdiExe = Get-ChildItem -Path $extractPath -Recurse -Filter $pattern -ErrorAction SilentlyContinue | 
-                    Where-Object { $_.Name -notlike "*unins*" -and $_.Name -notlike "*uninst*" } | 
-                    Select-Object -First 1
+                Where-Object { $_.Name -notlike "*unins*" -and $_.Name -notlike "*uninst*" } | 
+                Select-Object -First 1
                 
                 if ($sdiExe) {
                     Write-Log "Ejecutable encontrado: $($sdiExe.Name) en $($sdiExe.DirectoryName)" "INFO"
@@ -332,24 +338,24 @@ function CrearAccesoDirectoEscritorio {
         
         # Rutas comunes donde buscar ejecutables
         $rutasComunes = @{
-            "Google.Chrome" = @(
+            "Google.Chrome"                 = @(
                 "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
                 "$env:ProgramFiles (x86)\Google\Chrome\Application\chrome.exe"
             )
-            "WhatsApp.WhatsApp" = @(
+            "WhatsApp.WhatsApp"             = @(
                 "$env:LOCALAPPDATA\WhatsApp\WhatsApp.exe",
                 "$env:ProgramFiles\WindowsApps\*WhatsApp*\WhatsApp.exe"
             )
-            "AnyDesk.AnyDesk" = @(
+            "AnyDesk.AnyDesk"               = @(
                 "$env:ProgramFiles (x86)\AnyDesk\AnyDesk.exe",
                 "$env:ProgramFiles\AnyDesk\AnyDesk.exe",
                 "$env:LOCALAPPDATA\AnyDesk\AnyDesk.exe"
             )
-            "Mozilla.Thunderbird" = @(
+            "Mozilla.Thunderbird"           = @(
                 "$env:ProgramFiles\Mozilla Thunderbird\thunderbird.exe",
                 "$env:ProgramFiles (x86)\Mozilla Thunderbird\thunderbird.exe"
             )
-            "Google.GoogleDrive" = @(
+            "Google.GoogleDrive"            = @(
                 "$env:ProgramFiles\Google\Drive File Stream\*\GoogleDriveFS.exe",
                 "$env:LOCALAPPDATA\Google\Drive\GoogleDriveFS.exe"
             )
@@ -357,29 +363,29 @@ function CrearAccesoDirectoEscritorio {
                 "$env:LOCALAPPDATA\Programs\Lively Wallpaper\Lively.exe",
                 "$env:ProgramFiles\Lively Wallpaper\Lively.exe"
             )
-            "RARLab.WinRAR" = @(
+            "RARLab.WinRAR"                 = @(
                 "$env:ProgramFiles\WinRAR\WinRAR.exe",
                 "$env:ProgramFiles (x86)\WinRAR\WinRAR.exe"
             )
-            "Adobe.Acrobat.Reader.64-bit" = @(
+            "Adobe.Acrobat.Reader.64-bit"   = @(
                 "$env:ProgramFiles\Adobe\Acrobat DC\Acrobat\Acrobat.exe",
                 "$env:ProgramFiles (x86)\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe",
                 "$env:ProgramFiles\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe"
             )
-            "Microsoft.Teams" = @(
+            "Microsoft.Teams"               = @(
                 "$env:LOCALAPPDATA\Microsoft\Teams\current\Teams.exe",
                 "$env:ProgramFiles\Microsoft\Teams\current\Teams.exe"
             )
-            "VideoLAN.VLC" = @(
+            "VideoLAN.VLC"                  = @(
                 "$env:ProgramFiles\VideoLAN\VLC\vlc.exe",
                 "$env:ProgramFiles (x86)\VideoLAN\VLC\vlc.exe"
             )
-            "Zoom.Zoom" = @(
+            "Zoom.Zoom"                     = @(
                 "$env:ProgramFiles\Zoom\bin\Zoom.exe",
                 "$env:ProgramFiles (x86)\Zoom\bin\Zoom.exe",
                 "$env:APPDATA\Zoom\bin\Zoom.exe"
             )
-            "Spotify.Spotify" = @(
+            "Spotify.Spotify"               = @(
                 "$env:APPDATA\Spotify\Spotify.exe",
                 "$env:LOCALAPPDATA\Microsoft\WindowsApps\Spotify.exe"
             )
@@ -413,8 +419,8 @@ function CrearAccesoDirectoEscritorio {
             
             foreach ($startPath in $startMenuPaths) {
                 $lnkFiles = Get-ChildItem -Path $startPath -Filter "*.lnk" -Recurse -ErrorAction SilentlyContinue | 
-                    Where-Object { $_.Name -like "*$nombrePrograma*" } | 
-                    Select-Object -First 1
+                Where-Object { $_.Name -like "*$nombrePrograma*" } | 
+                Select-Object -First 1
                 
                 if ($lnkFiles) {
                     $shortcut = $WshShell.CreateShortcut($lnkFiles.FullName)
@@ -757,8 +763,8 @@ function InstalarYActualizarProgramas {
         # Si no se detectó con winget, buscar en registro/programas
         if (-not $estaInstalado -and $programa.verificar) {
             $registroApps = Get-ChildItem "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall" -ErrorAction SilentlyContinue | 
-                Get-ItemProperty -ErrorAction SilentlyContinue | 
-                Where-Object { $_.DisplayName -like "*$($programa.verificar)*" }
+            Get-ItemProperty -ErrorAction SilentlyContinue | 
+            Where-Object { $_.DisplayName -like "*$($programa.verificar)*" }
             
             if ($registroApps) {
                 $estaInstalado = $true
@@ -773,7 +779,8 @@ function InstalarYActualizarProgramas {
                         $estaInstalado = $true
                         Write-Log "Detectado en Microsoft Store (AppX): $($programa.nombre)" "DEBUG"
                     }
-                } catch {
+                }
+                catch {
                     Write-Log "No se pudo verificar AppX para $($programa.nombre)" "DEBUG"
                 }
             }
@@ -810,9 +817,10 @@ function InstalarYActualizarProgramas {
                         Start-Sleep -Seconds 2
                         $spotifyAppx = Get-AppxPackage -Name "*Spotify*" -ErrorAction SilentlyContinue
                         if ($spotifyAppx) {
-                            Write-Log "✅ Spotify instalado desde Microsoft Store (AppX)." "INFO"
+                            Write-Log " Spotify instalado desde Microsoft Store (AppX)." "INFO"
                             CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
-                        } else {
+                        }
+                        else {
                             throw "Spotify AppX no detectado tras instalación MS Store"
                         }
                     }
@@ -849,10 +857,11 @@ function InstalarYActualizarProgramas {
                                 Unregister-ScheduledTask -TaskName $taskNameSpotifyExe -Confirm:$false -ErrorAction SilentlyContinue
                                 
                                 if (Test-Path $spotifyExe) {
-                                    Write-Log "✅ Spotify instalado correctamente en %APPDATA%\Spotify" "INFO"
+                                    Write-Log " Spotify instalado correctamente en %APPDATA%\Spotify" "INFO"
                                     CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
-                                } else {
-                                    Write-Log "⚠️  Spotify aún no aparece instalado (puede requerir interacción del usuario o permisos)." "WARNING"
+                                }
+                                else {
+                                    Write-Log "  Spotify aún no aparece instalado (puede requerir interacción del usuario o permisos)." "WARNING"
                                     Write-Log "  Abriendo página de descarga para instalación manual..." "INFO"
                                     AbrirEnNavegador $programa.fallbackPage
                                 }
@@ -864,7 +873,8 @@ function InstalarYActualizarProgramas {
                             AbrirEnNavegador $programa.fallbackPage
                         }
                     }
-                } else {
+                }
+                else {
                     Write-Warning "No hay URL para Spotify. Se omitio la instalacion."
                 }
             }
@@ -877,7 +887,8 @@ function InstalarYActualizarProgramas {
                         Start-Sleep -Seconds 3
                         # Crear acceso directo en escritorio
                         CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
-                    } else {
+                    }
+                    else {
                         throw "Winget retorno codigo: $LASTEXITCODE"
                     }
                 }
@@ -889,7 +900,8 @@ function InstalarYActualizarProgramas {
                         InstalarDesdeWeb -nombre $programa.nombre -url $programa.fallbackUrl -archivo $programa.archivo -fallbackPage $programa.fallbackPage
                         Start-Sleep -Seconds 5
                         CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
-                    } else {
+                    }
+                    else {
                         Write-Warning "No hay URL alternativa para $($programa.nombre). Se omitio la instalacion."
                     }
                 }
@@ -907,7 +919,8 @@ function InstalarYActualizarProgramas {
                     if ($LASTEXITCODE -eq 0) {
                         Write-Log "$($programa.nombre) actualizado correctamente." "INFO"
                     }
-                } catch {
+                }
+                catch {
                     Write-Warning "No se pudo actualizar $($programa.nombre): $_"
                 }
             }
@@ -1182,7 +1195,7 @@ function DescargarFondosYProtectorDePantalla {
                     Set-ItemProperty -Path $regPath -Name 'ScreenSaveUsePassword' -Value '0' -Force
                     
                     # Forzar actualización del sistema
-                    rundll32.exe user32.dll,UpdatePerUserSystemParameters
+                    rundll32.exe user32.dll, UpdatePerUserSystemParameters
                     Start-Sleep -Seconds 2
                     
                     Write-Log "PASO 5.5: Protector configurado en backend (5 minutos)." "INFO"
@@ -1239,7 +1252,8 @@ function ValidarYConvertirVideoLively {
                 $ffmpegPath = $path
                 break
             }
-        } catch { }
+        }
+        catch { }
     }
     
     # Si FFmpeg no está, intentar instalarlo
@@ -1274,7 +1288,8 @@ function ValidarYConvertirVideoLively {
                 $ffmpegPath = "ffmpeg.exe"
                 Write-Log "FFmpeg instalado correctamente." "INFO"
             }
-        } catch {
+        }
+        catch {
             Write-Log "No se pudo instalar FFmpeg automáticamente: $_. Usando video original." "WARNING"
             return $videoPath
         }
@@ -1319,11 +1334,12 @@ function ValidarYConvertirVideoLively {
         if (Test-Path $videoPathConverted -ErrorAction SilentlyContinue) {
             $originalSize = (Get-Item $videoPath).Length / 1MB
             $convertedSize = (Get-Item $videoPathConverted).Length / 1MB
-            Write-Log "✅ Video convertido exitosamente." "INFO"
+            Write-Log "Video convertido exitosamente." "INFO"
             Write-Log "  - Original: $([Math]::Round($originalSize, 2)) MB" "INFO"
             Write-Log "  - Convertido: $([Math]::Round($convertedSize, 2)) MB" "INFO"
             return $videoPathConverted
-        } else {
+        }
+        else {
             Write-Log "FFmpeg completó pero archivo no se generó. Últimas líneas:" "WARNING"
             if ($ffmpegOutput) {
                 $ffmpegOutput | Select-Object -Last 5 | ForEach-Object { Write-Log "  $_" "DEBUG" }
@@ -1363,7 +1379,7 @@ function ConfigurarLivelyProtectorYFondo {
         $videoPath = Join-Path ([Environment]::GetFolderPath("MyVideos")) "PROTECTOR-1.mp4"
         $videoPathConverted = Join-Path ([Environment]::GetFolderPath("MyVideos")) "PROTECTOR-1_compatible.mp4"
         $fondoPath = Join-Path ([Environment]::GetFolderPath("MyPictures")) "Fondos\Fondo de Escritorio.png"
-        $destScr   = "C:\Windows\Lively.scr"  # Ubicación correcta del screensaver
+        $destScr = "C:\Windows\Lively.scr"  # Ubicación correcta del screensaver
 
         # Paso 0.5: Validar y convertir video si es necesario
         Write-Log "Paso 0.5: Validando compatibilidad del video..." "INFO"
@@ -1397,7 +1413,7 @@ function ConfigurarLivelyProtectorYFondo {
             Set-ItemProperty -Path $regPath -Name "ScreenSaveUsePassword" -Value "0" -Force
             
             # Aplicar cambios inmediatamente
-            rundll32.exe user32.dll,UpdatePerUserSystemParameters
+            rundll32.exe user32.dll, UpdatePerUserSystemParameters
             Start-Sleep -Seconds 2
             
             Write-Log "Paso 2: Protector de pantalla configurado (5 minutos)." "INFO"
@@ -1464,7 +1480,7 @@ function ConfigurarLivelyProtectorYFondo {
                     }
                     else {
                         # Generar nombre único para la carpeta del wallpaper
-                        $uniqueId = -join ((65..90) + (97..122) | Get-Random -Count 8 | ForEach-Object {[char]$_})
+                        $uniqueId = -join ((65..90) + (97..122) | Get-Random -Count 8 | ForEach-Object { [char]$_ })
                         $videoWallpaperFolder = Join-Path $libraryPath "${uniqueId}.mp4"
                         New-Item -ItemType Directory -Path $videoWallpaperFolder -Force | Out-Null
                         
@@ -1476,17 +1492,17 @@ function ConfigurarLivelyProtectorYFondo {
                     
                     # Crear o actualizar LivelyInfo.json para el video
                     $livelyInfo = @{
-                        AppVersion = "2.2.1.0"
-                        Title = "Protector Vidanova"
-                        Thumbnail = "PROTECTOR-1.mp4"
-                        Preview = "PROTECTOR-1.mp4"
-                        Desc = "Video protector de pantalla Vidanova"
-                        Author = "Vidanova"
-                        License = ""
-                        Contact = ""
-                        Type = 1  # Video type
-                        FileName = "PROTECTOR-1.mp4"
-                        Arguments = $null
+                        AppVersion     = "2.2.1.0"
+                        Title          = "Protector Vidanova"
+                        Thumbnail      = "PROTECTOR-1.mp4"
+                        Preview        = "PROTECTOR-1.mp4"
+                        Desc           = "Video protector de pantalla Vidanova"
+                        Author         = "Vidanova"
+                        License        = ""
+                        Contact        = ""
+                        Type           = 1  # Video type
+                        FileName       = "PROTECTOR-1.mp4"
+                        Arguments      = $null
                         IsAbsolutePath = $false
                     }
                     
@@ -1570,10 +1586,10 @@ function ConfigurarLivelyProtectorYFondo {
             Write-Log "Paso 4: Lively no estaba ejecutándose." "DEBUG"
         }
 
-        Write-Log "✅ Configuración de Lively completada: solo protector activo, fondo estático." "INFO"
+        Write-Log "Configuración de Lively completada: solo protector activo, fondo estático." "INFO"
     }
     catch {
-        Write-Warning "⚠️ Error en la configuración de Lively: $_"
+        Write-Warning "Error en la configuración de Lively: $_"
     }
 }
 
@@ -1676,7 +1692,8 @@ function ConfigurarBarraTareasWindows11 {
                     Stop-Service -Name 'WidgetService' -Force -ErrorAction SilentlyContinue
                     Set-Service -Name 'WidgetService' -StartupType Disabled -ErrorAction SilentlyContinue
                     Write-Log "→ Servicio WidgetService deshabilitado." "DEBUG"
-                } catch {
+                }
+                catch {
                     Write-Log "→ WidgetService no disponible en esta build." "DEBUG"
                 }
                 
@@ -1728,8 +1745,9 @@ function ConfigurarBarraTareasWindows11 {
             
             # Forzar actualización del sistema
             try {
-                rundll32.exe user32.dll,UpdatePerUserSystemParameters -ErrorAction SilentlyContinue
-            } catch { }
+                rundll32.exe user32.dll, UpdatePerUserSystemParameters -ErrorAction SilentlyContinue
+            }
+            catch { }
             
             # Reiniciar explorer
             Start-Process explorer.exe
@@ -1740,9 +1758,6 @@ function ConfigurarBarraTareasWindows11 {
         }
         catch {
             Write-Warning "No se pudo reiniciar Explorer automáticamente. Reinicia manualmente si es necesario."
-        }
-        else {
-            Write-Log "✅ Todas las configuraciones de barra de tareas ya estaban aplicadas. No se requieren cambios." "INFO"
         }
     }
     catch {
@@ -1802,7 +1817,7 @@ function GestionarAnclajeBarraTareas {
             if ($lnkPath) {
                 try {
                     $folder = $shell.Namespace((Split-Path $lnkPath))
-                    $item   = $folder.ParseName((Split-Path $lnkPath -Leaf))
+                    $item = $folder.ParseName((Split-Path $lnkPath -Leaf))
                     try { $item.InvokeVerb('taskbarunpin') } catch {
                         $verb = $item.Verbs() | Where-Object { $_.Name -match 'Desanclar|Quitar|Unpin' } | Select-Object -First 1
                         if ($verb) { $verb.DoIt() }
@@ -1855,7 +1870,7 @@ function GestionarAnclajeBarraTareas {
                 try {
                     Write-Log "  - Anclando $($entry.nombre) a barra de tareas..." "INFO"
                     $folder = $shell.Namespace((Split-Path $lnkPath))
-                    $item   = $folder.ParseName((Split-Path $lnkPath -Leaf))
+                    $item = $folder.ParseName((Split-Path $lnkPath -Leaf))
                     try { $item.InvokeVerb('taskbarpin') } catch {
                         $verb = $item.Verbs() | Where-Object { $_.Name -match 'Pin|Anclar' } | Select-Object -First 1
                         if ($verb) { $verb.DoIt() } else { Write-Log "  - Verbo de anclaje no disponible" "DEBUG" }
@@ -1896,14 +1911,14 @@ function GestionarAnclajeBarraTareas {
 
 # =================== BLOQUE PRINCIPAL AQUI =====================
 try {
-    Write-Log "`nIniciando mantenimiento del sistema..." "INFO"
+    Write-Log 'Iniciando mantenimiento del sistema...' 'INFO'
     VerificarConectividad
 
     # Inicializar Winget
     InicializarWinget
 
     $fabricante = DetectarFabricante
-    Write-Log "`nFabricante: $fabricante" "INFO"
+    Write-Log ('Fabricante: ' + $fabricante) 'INFO'
     InstalarSoporteFabricante -fab $fabricante
 
     #Aqui funcion de Programas
@@ -1922,18 +1937,18 @@ try {
     GestionarAnclajeBarraTareas
 }
 catch {
-    Write-Log "Error critico: $_" "ERROR"
+    Write-Log 'Error critico: $_' 'ERROR'
 }
 finally {
     # Cerrar Explorador de Archivos si está abierto
-    Write-Log "Cerrando Explorador de Archivos si está abierto..." "INFO"
+    Write-Log 'Cerrando Explorador de Archivos si está abierto...' 'INFO'
     try {
         Get-Process -Name explorer -ErrorAction SilentlyContinue | Stop-Process -Force
         Start-Sleep -Seconds 1
     }
     catch {
-        Write-Log "No había Explorador abierto o ya estaba cerrado." "DEBUG"
+        Write-Log 'No había Explorador abierto o ya estaba cerrado.' 'DEBUG'
     }
     
-    Read-Host "Mantenimiento completado o detenido. Presione ENTER para salir"
+    Read-Host 'Mantenimiento completado o detenido. Presione ENTER para salir'
 }
