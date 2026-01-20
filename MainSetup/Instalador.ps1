@@ -874,7 +874,7 @@ Start-Process -FilePath '$ruta' -Wait
                                 do {
                                     Start-Sleep -Seconds 3
                                     if (Test-Path $spotifyExe) {
-                                        Write-Log "  ✓ Spotify detectado!" "DEBUG"
+                                        Write-Log " Spotify detectado..." "DEBUG"
                                         break
                                     }
                                 } while ((-not $proceso.HasExited) -and ((New-TimeSpan -Start $waitStart -End (Get-Date)).TotalSeconds -lt 300))
@@ -883,7 +883,7 @@ Start-Process -FilePath '$ruta' -Wait
                                 Remove-Item -Path $scriptAuxiliar -Force -ErrorAction SilentlyContinue
                                 
                                 if (Test-Path $spotifyExe) {
-                                    Write-Log "✓ Spotify instalado correctamente en %APPDATA%\Spotify" "INFO"
+                                    Write-Log " Spotify instalado correctamente en %APPDATA%\Spotify" "INFO"
                                     CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
                                 }
                                 else {
