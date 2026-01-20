@@ -896,7 +896,7 @@ Start-Process -FilePath '$ruta' -Wait
                         }
                         catch {
                             Write-Log "  Paso 2 también falló: $($_)" "DEBUG"
-                            Write-Log "⚠️  No se pudo instalar Spotify automáticamente. Por favor instala manualmente." "WARNING"
+                            Write-Log "  No se pudo instalar Spotify automáticamente. Por favor instala manualmente." "WARNING"
                             AbrirEnNavegador $programa.fallbackPage
                         }
                     }
