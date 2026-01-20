@@ -877,7 +877,7 @@ Start-Process -FilePath '$ruta' -Wait
                                         Write-Log "  ✓ Spotify detectado!" "DEBUG"
                                         break
                                     }
-                                } while (-not $proceso.HasExited -or ((New-TimeSpan -Start $waitStart -End (Get-Date)).TotalSeconds -lt 300))
+                                } while ((-not $proceso.HasExited) -and ((New-TimeSpan -Start $waitStart -End (Get-Date)).TotalSeconds -lt 300))
                                 
                                 # Limpieza
                                 Remove-Item -Path $scriptAuxiliar -Force -ErrorAction SilentlyContinue
