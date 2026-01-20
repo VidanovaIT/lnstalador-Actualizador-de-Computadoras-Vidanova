@@ -1,4 +1,4 @@
-﻿# Instalador y Actualizador de Software para Primeras Computadoras VIDANOVA
+# Instalador y Actualizador de Software para Primeras Computadoras VIDANOVA
 
 
 # Ejecutar como Administrador
@@ -842,7 +842,7 @@ function InstalarYActualizarProgramas {
                     }
                     catch {
                         Write-Log "  Paso 1 falló: $($_)" "DEBUG"
-                        Write-Log "  Paso 2: Intentando instalador EXE con Task Scheduler..." "DEBUG"
+                        Write-Log "  Paso 2: Intentando instalador EXE directo..." "DEBUG"
                         
                         try {
                             # Descargar instalador
@@ -853,32 +853,43 @@ function InstalarYActualizarProgramas {
                             }
                             
                             if (Test-Path $ruta) {
-                                # Crear tarea programada para ejecutar como usuario (no admin)
-                                $taskNameSpotifyExe = "Vidanova_InstallSpotifyExe_" + ([System.Guid]::NewGuid().ToString())
-                                $actionSpotifyExe = New-ScheduledTaskAction -Execute $ruta -WorkingDirectory (Split-Path $ruta)
-                                $triggerSpotifyExe = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddSeconds(5))
-                                $principalSpotifyExe = New-ScheduledTaskPrincipal -UserId $env:UserName -LogonType Interactive
+                                Write-Log "  Lanzando instalador de Spotify (por favor completa la instalación cuando aparezca)..." "INFO"
                                 
-                                Register-ScheduledTask -TaskName $taskNameSpotifyExe -Action $actionSpotifyExe -Trigger $triggerSpotifyExe -Principal $principalSpotifyExe -Force | Out-Null
-                                Write-Log "  Lanzando instalador EXE como usuario normal (por favor completa la instalación)..." "INFO"
-                                Start-ScheduledTask -TaskName $taskNameSpotifyExe
+                                # Ejecutar el instalador directamente sin elevación (ya que estamos como admin, 
+                                # necesitamos crear un proceso hijo que NO sea admin)
+                                # Usamos un script auxiliar que se ejecuta como usuario normal
+                                $scriptAuxiliar = "$env:TEMP\InstalarSpotify_Temp.ps1"
+                                @"
+Start-Process -FilePath '$ruta' -Wait
+"@ | Set-Content -Path $scriptAuxiliar -Force
                                 
-                                # Esperar a que Spotify esté disponible (máx 5 minutos)
+                                # Ejecutar el script como usuario actual (sin elevación)
+                                $proceso = Start-Process -FilePath "powershell.exe" -ArgumentList "-ExecutionPolicy Bypass -NoProfile -WindowStyle Normal -File `"$scriptAuxiliar`"" -PassThru -WindowStyle Normal
+                                
+                                Write-Log "  Esperando a que completes la instalación de Spotify..." "INFO"
+                                
+                                # Esperar a que el proceso termine o que Spotify esté disponible (máx 5 minutos)
                                 $spotifyExe = Join-Path $env:APPDATA "Spotify\Spotify.exe"
                                 $waitStart = Get-Date
                                 do {
                                     Start-Sleep -Seconds 3
-                                } while (-not (Test-Path $spotifyExe) -and ((New-TimeSpan -Start $waitStart -End (Get-Date)).TotalSeconds -lt 300))
+                                    if (Test-Path $spotifyExe) {
+                                        Write-Log "  ✓ Spotify detectado!" "DEBUG"
+                                        break
+                                    }
+                                } while (-not $proceso.HasExited -or ((New-TimeSpan -Start $waitStart -End (Get-Date)).TotalSeconds -lt 300))
                                 
-                                Unregister-ScheduledTask -TaskName $taskNameSpotifyExe -Confirm:$false -ErrorAction SilentlyContinue
+                                # Limpieza
+                                Remove-Item -Path $scriptAuxiliar -Force -ErrorAction SilentlyContinue
                                 
                                 if (Test-Path $spotifyExe) {
-                                    Write-Log " Spotify instalado correctamente en %APPDATA%\Spotify" "INFO"
+                                    Write-Log "✓ Spotify instalado correctamente en %APPDATA%\Spotify" "INFO"
                                     CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
                                 }
                                 else {
-                                    Write-Log "  Spotify aún no aparece instalado (puede requerir interacción del usuario o permisos)." "WARNING"
-                                    Write-Log "  Abriendo página de descarga para instalación manual..." "INFO"
+                                    Write-Log "  Spotify no se detectó después de la instalación." "WARNING"
+                                    Write-Log "  Si cerraste el instalador, puedes ejecutarlo manualmente desde: $ruta" "INFO"
+                                    Write-Log "  O descárgalo desde la página oficial..." "INFO"
                                     AbrirEnNavegador $programa.fallbackPage
                                 }
                             }
