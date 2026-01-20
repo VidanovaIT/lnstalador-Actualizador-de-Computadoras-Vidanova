@@ -1,4 +1,4 @@
-# Instalador y Actualizador de Software para Primeras Computadoras VIDANOVA
+﻿# Instalador y Actualizador de Software para Primeras Computadoras VIDANOVA
 
 
 # Ejecutar como Administrador
@@ -291,7 +291,7 @@ function InstalarSoporteFabricante {
     }
 
     if ($fab -eq "Desconocido" -or !$urls.ContainsKey($fab)) {
-        Write-Warning "Fabricante no reconocido. Se usará SDI Lite como solucion de respaldo." "WARNING"
+        Write-Warning "Fabricante no reconocido. Se usar SDI Lite como solucion de respaldo." "WARNING"
         UsarSDILite
         return
     }
@@ -301,26 +301,26 @@ function InstalarSoporteFabricante {
         return
     }
 
-    Write-Log "Fabricante soportado. Se recomienda usar la página oficial para drivers:" "INFO"
+    Write-Log "Fabricante soportado. Se recomienda usar la pgina oficial para drivers:" "INFO"
     Write-Log " - ${fab}: $($urls[$fab])" "INFO"
     
     # Permitir al usuario decidir si usar SDI Lite como alternativa
     Write-Host ""
     Write-Host "________________________________________________" -ForegroundColor Cyan
-    Write-Host "¿Deseas usar SDI Lite como herramienta alternativa?" -ForegroundColor Cyan
-    Write-Host "SDI Lite descargara automáticamente los drivers mas recientes." -ForegroundColor Cyan
+    Write-Host "Deseas usar SDI Lite como herramienta alternativa?" -ForegroundColor Cyan
+    Write-Host "SDI Lite descargara automticamente los drivers mas recientes." -ForegroundColor Cyan
     Write-Host "________________________________________________" -ForegroundColor Cyan
     Write-Host ""
     
-    $usarSDILite = PedirConfirmacion "¿Usar SDI Lite? (y/n): "
+    $usarSDILite = PedirConfirmacion "Usar SDI Lite? (y/n): "
     
     if ($usarSDILite) {
-        Write-Log "Usuario eligió usar SDI Lite." "INFO"
+        Write-Log "Usuario eligi usar SDI Lite." "INFO"
         UsarSDILite
     }
     else {
-        Write-Log "Usuario decidió no usar SDI Lite en este momento." "INFO"
-        Write-Host "Puedes visitar la página oficial del fabricante más adelante si lo necesitas." -ForegroundColor Green
+        Write-Log "Usuario decidi no usar SDI Lite en este momento." "INFO"
+        Write-Host "Puedes visitar la pgina oficial del fabricante ms adelante si lo necesitas." -ForegroundColor Green
     }
 
 }
@@ -410,7 +410,7 @@ function CrearAccesoDirectoEscritorio {
             }
         }
         
-        # Si no se encontró, buscar en el menú inicio
+        # Si no se encontr, buscar en el men inicio
         if (-not $ejecutable) {
             $startMenuPaths = @(
                 "$env:ProgramData\Microsoft\Windows\Start Menu\Programs",
@@ -432,13 +432,13 @@ function CrearAccesoDirectoEscritorio {
             }
         }
         
-        # Crear acceso directo si se encontró el ejecutable
+        # Crear acceso directo si se encontr el ejecutable
         if ($ejecutable -and (Test-Path $ejecutable)) {
             $shortcutPath = Join-Path $desktop "$nombrePrograma.lnk"
             
             # Verificar si ya existe un acceso directo con el mismo nombre exacto
             if (Test-Path $shortcutPath) {
-                Write-Log "   ↳ Acceso directo ya existe en escritorio: $nombrePrograma.lnk" "DEBUG"
+                Write-Log "    Acceso directo ya existe en escritorio: $nombrePrograma.lnk" "DEBUG"
                 return
             }
             
@@ -448,7 +448,7 @@ function CrearAccesoDirectoEscritorio {
                 try {
                     $existingShortcut = $WshShell.CreateShortcut($existingLnk.FullName)
                     if ($existingShortcut.TargetPath -eq $ejecutable) {
-                        Write-Log "   ↳ Ya existe acceso directo al mismo programa: $($existingLnk.Name)" "DEBUG"
+                        Write-Log "    Ya existe acceso directo al mismo programa: $($existingLnk.Name)" "DEBUG"
                         return
                     }
                 }
@@ -463,14 +463,14 @@ function CrearAccesoDirectoEscritorio {
             $shortcut.WorkingDirectory = Split-Path $ejecutable -Parent
             $shortcut.Save()
             
-            Write-Log "   ↳ Acceso directo creado en escritorio: $nombrePrograma.lnk" "INFO"
+            Write-Log "    Acceso directo creado en escritorio: $nombrePrograma.lnk" "INFO"
         }
         else {
-            Write-Log "   ↳ No se pudo encontrar ejecutable para crear acceso directo de $nombrePrograma" "DEBUG"
+            Write-Log "    No se pudo encontrar ejecutable para crear acceso directo de $nombrePrograma" "DEBUG"
         }
     }
     catch {
-        Write-Log "   ↳ Error creando acceso directo para $nombrePrograma : $($_)" "DEBUG"
+        Write-Log "    Error creando acceso directo para $nombrePrograma : $($_)" "DEBUG"
     }
     finally {
         if ($WshShell) {
@@ -566,7 +566,7 @@ function AbrirEnNavegador {
     }
 }
 
-# Ejecuta winget sin elevación mediante una tarea programada temporal (para MS Store)
+# Ejecuta winget sin elevacin mediante una tarea programada temporal (para MS Store)
 function EjecutarWingetUnelevated {
     param(
         [string]$argumentos,
@@ -596,7 +596,7 @@ function EjecutarWingetUnelevated {
         return $true
     }
     catch {
-        Write-Log "Error ejecutando winget sin elevación: $($_)" "WARNING"
+        Write-Log "Error ejecutando winget sin elevacin: $($_)" "WARNING"
         return $false
     }
 }
@@ -661,14 +661,14 @@ function InstalarDesdeWeb {
             }
             elseif ($esExe -or ($archivo.ToLower().EndsWith(".exe") -and $tam -gt 800000)) {
                 if ($RunUnelevated) {
-                    Write-Log "Ejecutando instalador EXE de $nombre como usuario normal (sin elevación)..." "INFO"
+                    Write-Log "Ejecutando instalador EXE de $nombre como usuario normal (sin elevacin)..." "INFO"
                     try {
                         $shell = New-Object -ComObject Shell.Application
                         $shell.ShellExecute($ruta, $null, (Split-Path $ruta -Parent), "open", 1)
                         Write-Log "$nombre lanzado en modo usuario normal." "INFO"
                     }
                     catch {
-                        Write-Warning "Fallo al ejecutar $nombre sin elevación: $($_)"
+                        Write-Warning "Fallo al ejecutar $nombre sin elevacin: $($_)"
                         if ($fallbackPage) {
                             Write-Log "Abriendo pagina oficial para instalacion manual de $nombre..." "INFO"
                             AbrirEnNavegador $fallbackPage
@@ -776,7 +776,7 @@ function InstalarYActualizarProgramas {
             Write-Log "Detectado por winget: $($programa.nombre)" "DEBUG"
         }
         
-        # Si no se detectó con winget, buscar en registro/programas
+        # Si no se detect con winget, buscar en registro/programas
         if (-not $estaInstalado -and $programa.verificar) {
             $registroApps = Get-ChildItem "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall" -ErrorAction SilentlyContinue | 
             Get-ItemProperty -ErrorAction SilentlyContinue | 
@@ -807,11 +807,11 @@ function InstalarYActualizarProgramas {
             
             # CASO ESPECIAL: Spotify no se puede instalar con Winget en contexto de administrador
             if ($programa.id -eq "Spotify.Spotify") {
-                Write-Log "Spotify detectado: requiere instalación en contexto de usuario normal (no admin)..." "INFO"
+                Write-Log "Spotify detectado: requiere instalacin en contexto de usuario normal (no admin)..." "INFO"
                 if ($programa.fallbackUrl) {
                     try {
                         # 1) Intento MS Store via task scheduler (contexto usuario, LogonType Interactive)
-                        Write-Log "  Paso 1: Intentando instalación desde Microsoft Store (scheduled task)..." "DEBUG"
+                        Write-Log "  Paso 1: Intentando instalacin desde Microsoft Store (scheduled task)..." "DEBUG"
                         $msStoreId = "9NCBCSZSJRSB"
                         $taskNameSpotify = "Vidanova_InstallSpotify_" + ([System.Guid]::NewGuid().ToString())
                         $actionSpotify = New-ScheduledTaskAction -Execute "winget.exe" -Argument "install --id $msStoreId --source msstore --accept-source-agreements --accept-package-agreements --force"
@@ -821,7 +821,7 @@ function InstalarYActualizarProgramas {
                         Register-ScheduledTask -TaskName $taskNameSpotify -Action $actionSpotify -Trigger $triggerSpotify -Principal $principalSpotify -Force | Out-Null
                         Start-ScheduledTask -TaskName $taskNameSpotify
                         
-                        # Esperar completación (máx 3 minutos)
+                        # Esperar completacin (mx 3 minutos)
                         $waitStart = Get-Date
                         do {
                             Start-Sleep -Seconds 3
@@ -837,11 +837,11 @@ function InstalarYActualizarProgramas {
                             CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
                         }
                         else {
-                            throw "Spotify AppX no detectado tras instalación MS Store"
+                            throw "Spotify AppX no detectado tras instalacin MS Store"
                         }
                     }
                     catch {
-                        Write-Log "  Paso 1 falló: $($_)" "DEBUG"
+                        Write-Log "  Paso 1 fall: $($_)" "DEBUG"
                         Write-Log "  Paso 2: Intentando instalador EXE directo..." "DEBUG"
                         
                         try {
@@ -853,9 +853,9 @@ function InstalarYActualizarProgramas {
                             }
                             
                             if (Test-Path $ruta) {
-                                Write-Log "  Lanzando instalador de Spotify (por favor completa la instalación cuando aparezca)..." "INFO"
+                                Write-Log "  Lanzando instalador de Spotify (por favor completa la instalacin cuando aparezca)..." "INFO"
                                 
-                                # Ejecutar el instalador directamente sin elevación (ya que estamos como admin, 
+                                # Ejecutar el instalador directamente sin elevacin (ya que estamos como admin, 
                                 # necesitamos crear un proceso hijo que NO sea admin)
                                 # Usamos un script auxiliar que se ejecuta como usuario normal
                                 $scriptAuxiliar = "$env:TEMP\InstalarSpotify_Temp.ps1"
@@ -863,12 +863,12 @@ function InstalarYActualizarProgramas {
 Start-Process -FilePath '$ruta' -Wait
 "@ | Set-Content -Path $scriptAuxiliar -Force
                                 
-                                # Ejecutar el script como usuario actual (sin elevación)
+                                # Ejecutar el script como usuario actual (sin elevacin)
                                 $proceso = Start-Process -FilePath "powershell.exe" -ArgumentList "-ExecutionPolicy Bypass -NoProfile -WindowStyle Normal -File `"$scriptAuxiliar`"" -PassThru -WindowStyle Normal
                                 
-                                Write-Log "  Esperando a que completes la instalación de Spotify..." "INFO"
+                                Write-Log "  Esperando a que completes la instalacin de Spotify..." "INFO"
                                 
-                                # Esperar a que el proceso termine o que Spotify esté disponible (máx 5 minutos)
+                                # Esperar a que el proceso termine o que Spotify est disponible (mx 5 minutos)
                                 $spotifyExe = Join-Path $env:APPDATA "Spotify\Spotify.exe"
                                 $waitStart = Get-Date
                                 do {
@@ -887,16 +887,16 @@ Start-Process -FilePath '$ruta' -Wait
                                     CrearAccesoDirectoEscritorio -nombrePrograma $programa.nombre -idPrograma $programa.id
                                 }
                                 else {
-                                    Write-Log "  Spotify no se detectó después de la instalación." "WARNING"
+                                    Write-Log "  Spotify no se detect despus de la instalacin." "WARNING"
                                     Write-Log "  Si cerraste el instalador, puedes ejecutarlo manualmente desde: $ruta" "INFO"
-                                    Write-Log "  O descárgalo desde la página oficial..." "INFO"
+                                    Write-Log "  O descrgalo desde la pgina oficial..." "INFO"
                                     AbrirEnNavegador $programa.fallbackPage
                                 }
                             }
                         }
                         catch {
-                            Write-Log "  Paso 2 también falló: $($_)" "DEBUG"
-                            Write-Log "  No se pudo instalar Spotify automáticamente. Por favor instala manualmente." "WARNING"
+                            Write-Log "  Paso 2 tambin fall: $($_)" "DEBUG"
+                            Write-Log "  No se pudo instalar Spotify automticamente. Por favor instala manualmente." "WARNING"
                             AbrirEnNavegador $programa.fallbackPage
                         }
                     }
@@ -1006,9 +1006,9 @@ function DescargarFondosYProtectorDePantalla {
 
         # ================= PASO 2: Crear carpetas si faltan =================
         try {
-            if (-not (Test-Path $pictures)) { New-Item -ItemType Directory -Path $pictures   | Out-Null; Write-Log "PASO 2: Creada carpeta Imágenes: $pictures" "INFO" }
+            if (-not (Test-Path $pictures)) { New-Item -ItemType Directory -Path $pictures   | Out-Null; Write-Log "PASO 2: Creada carpeta Imgenes: $pictures" "INFO" }
             if (-not (Test-Path $fondosPath)) { New-Item -ItemType Directory -Path $fondosPath | Out-Null; Write-Log "PASO 2: Creada carpeta Fondos:   $fondosPath" "INFO" }
-            if (-not (Test-Path $videos)) { New-Item -ItemType Directory -Path $videos     | Out-Null; Write-Log "PASO 2: Creada carpeta Vídeos:   $videos" "INFO" }
+            if (-not (Test-Path $videos)) { New-Item -ItemType Directory -Path $videos     | Out-Null; Write-Log "PASO 2: Creada carpeta Vdeos:   $videos" "INFO" }
             if (-not (Test-Path $downloads)) { New-Item -ItemType Directory -Path $downloads  | Out-Null; Write-Log "PASO 2: Creada carpeta Descargas: $downloads" "INFO" }
         }
         catch {
@@ -1026,11 +1026,11 @@ function DescargarFondosYProtectorDePantalla {
                 Write-Log "PASO 3: Descargando $($fondo.nombre)..." "INFO"
                 Invoke-WebRequest -Uri $fondo.url -OutFile $destino -UseBasicParsing -ErrorAction Stop
 
-                # Validacion (mínimo 20 KB)
+                # Validacion (mnimo 20 KB)
                 if (-not (Test-Path $destino) -or (Get-Item $destino).Length -lt 20480) {
-                    throw "Archivo incompleto o demasiado pequeño: $destino"
+                    throw "Archivo incompleto o demasiado pequeo: $destino"
                 }
-                Write-Log "PASO 3: OK $($fondo.nombre) → $destino" "INFO"
+                Write-Log "PASO 3: OK $($fondo.nombre)  $destino" "INFO"
             }
             catch {
                 Write-Warning "FALLO PASO 3 (fondo $($fondo.nombre)): $($_)"
@@ -1048,7 +1048,7 @@ function DescargarFondosYProtectorDePantalla {
                     Start-BitsTransfer -Source $videoUrl -Destination $videoDestino -ErrorAction Stop
                 }
                 catch {
-                    Write-Warning "BITS falló, usando Invoke-WebRequest. $($_)"
+                    Write-Warning "BITS fall, usando Invoke-WebRequest. $($_)"
                     Invoke-WebRequest -Uri $videoUrl -OutFile $videoDestino -UseBasicParsing -ErrorAction Stop
                 }
             }
@@ -1056,12 +1056,12 @@ function DescargarFondosYProtectorDePantalla {
                 Write-Warning "FALLO PASO 4 (descargar video): $($_)"
             }
 
-            # Validación (mínimo 1 MB)
+            # Validacin (mnimo 1 MB)
             if (-not (Test-Path $videoDestino) -or (Get-Item $videoDestino).Length -lt 1048576) {
-                Write-Warning "FALLO PASO 4.3: Video ausente o demasiado pequeño: $videoDestino"
+                Write-Warning "FALLO PASO 4.3: Video ausente o demasiado pequeo: $videoDestino"
             }
             else {
-                Write-Log "PASO 4: OK video → $videoDestino" "INFO"
+                Write-Log "PASO 4: OK video  $videoDestino" "INFO"
             }
         }
         # ================= PASO 5: Descargar e instalar Lively (v2.2.1.0) =================
@@ -1070,7 +1070,7 @@ function DescargarFondosYProtectorDePantalla {
             $downloads = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'
             $exePath = Join-Path $downloads "lively_setup_x86_full_v2210.exe"
             
-            # Verificar si Lively ya está instalado
+            # Verificar si Lively ya est instalado
             $livelyInstalled = $false
             $livelyPaths = @(
                 "$env:LOCALAPPDATA\Programs\Lively Wallpaper\Lively.exe",
@@ -1081,16 +1081,16 @@ function DescargarFondosYProtectorDePantalla {
             foreach ($path in $livelyPaths) {
                 if (Test-Path $path) {
                     $livelyInstalled = $true
-                    Write-Log "PASO 5: Lively ya está instalado en: $path" "INFO"
+                    Write-Log "PASO 5: Lively ya est instalado en: $path" "INFO"
                     break
                 }
             }
             
             if ($livelyInstalled) {
-                Write-Log "PASO 5: Cerrando Lively si está en ejecución..." "INFO"
+                Write-Log "PASO 5: Cerrando Lively si est en ejecucin..." "INFO"
                 Get-Process -Name "Lively" -ErrorAction SilentlyContinue | Stop-Process -Force
                 Start-Sleep -Seconds 3
-                Write-Log "PASO 5: Omitiendo reinstalación de Lively (ya instalado)." "INFO"
+                Write-Log "PASO 5: Omitiendo reinstalacin de Lively (ya instalado)." "INFO"
             }
             else {
                 # Si ya existe el instalador, omitir descarga
@@ -1103,15 +1103,15 @@ function DescargarFondosYProtectorDePantalla {
                         Start-BitsTransfer -Source $exeUrl -Destination $exePath -ErrorAction Stop
                     }
                     catch {
-                        Write-Warning "BITS falló, usando Invoke-WebRequest: $($_)"
+                        Write-Warning "BITS fall, usando Invoke-WebRequest: $($_)"
                         Invoke-WebRequest -Uri $exeUrl -OutFile $exePath -UseBasicParsing -ErrorAction Stop
                     }
 
-                    # Validar tamaño mínimo (~50 MB)
+                    # Validar tamao mnimo (~50 MB)
                     if (-not (Test-Path $exePath) -or (Get-Item $exePath).Length -lt 50000000) {
                         throw "El instalador parece incompleto: $exePath"
                     }
-                    Write-Log "PASO 5.1: Instalador descargado correctamente → $exePath" "INFO"
+                    Write-Log "PASO 5.1: Instalador descargado correctamente  $exePath" "INFO"
                 }
 
                 # PASO 5.2: Ejecutar instalador en modo silencioso
@@ -1123,7 +1123,7 @@ function DescargarFondosYProtectorDePantalla {
                 # /NODEPENDENCIES = No instala vcredist/dotnet (opcionalmente)
                 Start-Process -FilePath $exePath -ArgumentList "/VERYSILENT /NOAUTOLAUNCH" -Wait -ErrorAction Stop
 
-                Write-Log "PASO 5.3: Instalación de Lively completada correctamente." "INFO"
+                Write-Log "PASO 5.3: Instalacin de Lively completada correctamente." "INFO"
             }
 
             # PASO 5.4: Descargar e instalar Lively Screensaver (Lively.scr)
@@ -1131,14 +1131,14 @@ function DescargarFondosYProtectorDePantalla {
                 $scrZipUrl = "https://github.com/rocksdanister/lively/releases/download/v2.2.0.0/lively_utility_screensaver.zip"
                 $scrZipPath = Join-Path $downloads "lively_utility_screensaver.zip"
                 $scrExtractPath = Join-Path $downloads "lively_screensaver_temp"
-                $scrDestPath = "C:\Windows\Lively.scr"  # Ubicación correcta según documentación
+                $scrDestPath = "C:\Windows\Lively.scr"  # Ubicacin correcta segn documentacin
 
                 Write-Log "PASO 5.4: Descargando Lively Screensaver..." "INFO"
                 try {
                     Start-BitsTransfer -Source $scrZipUrl -Destination $scrZipPath -ErrorAction Stop
                 }
                 catch {
-                    Write-Warning "BITS falló, usando Invoke-WebRequest: $($_)"
+                    Write-Warning "BITS fall, usando Invoke-WebRequest: $($_)"
                     Invoke-WebRequest -Uri $scrZipUrl -OutFile $scrZipPath -UseBasicParsing -ErrorAction Stop
                 }
 
@@ -1157,7 +1157,7 @@ function DescargarFondosYProtectorDePantalla {
                 # Extraer ZIP
                 Expand-Archive -Path $scrZipPath -DestinationPath $scrExtractPath -Force
 
-                # Buscar Lively.scr en la carpeta extraída
+                # Buscar Lively.scr en la carpeta extrada
                 $scrFile = Get-ChildItem -Path $scrExtractPath -Filter "Lively.scr" -Recurse | Select-Object -First 1
 
                 if ($scrFile) {
@@ -1170,7 +1170,7 @@ function DescargarFondosYProtectorDePantalla {
                     if (Test-Path $scrDestPath) {
                         Write-Log "PASO 5.4: Lively.scr copiado exitosamente a C:\Windows" "INFO"
                         
-                        # Dar permisos de ejecución explícitos al archivo .scr
+                        # Dar permisos de ejecucin explcitos al archivo .scr
                         try {
                             $acl = Get-Acl $scrDestPath
                             $everyone = New-Object System.Security.Principal.SecurityIdentifier("S-1-1-0")
@@ -1181,10 +1181,10 @@ function DescargarFondosYProtectorDePantalla {
                             )
                             $acl.SetAccessRule($accessRule)
                             Set-Acl -Path $scrDestPath -AclObject $acl
-                            Write-Log "PASO 5.4: Permisos de ejecución configurados para Lively.scr" "DEBUG"
+                            Write-Log "PASO 5.4: Permisos de ejecucin configurados para Lively.scr" "DEBUG"
                         }
                         catch {
-                            Write-Log "PASO 5.4: No se pudieron configurar permisos (no crítico): $($_)" "DEBUG"
+                            Write-Log "PASO 5.4: No se pudieron configurar permisos (no crtico): $($_)" "DEBUG"
                         }
                         
                         # Registrar en el registro de Windows de forma directa (backend)
@@ -1208,7 +1208,7 @@ function DescargarFondosYProtectorDePantalla {
                     }
                 }
                 else {
-                    Write-Warning "PASO 5.4: No se encontró Lively.scr en el archivo extraído."
+                    Write-Warning "PASO 5.4: No se encontr Lively.scr en el archivo extrado."
                 }
 
                 # Limpiar archivos temporales
@@ -1228,7 +1228,7 @@ function DescargarFondosYProtectorDePantalla {
 
             # PASO 5.5: Registrar Lively como protector de pantalla
             try {
-                $scrPath = "C:\Windows\Lively.scr"  # Ubicación correcta
+                $scrPath = "C:\Windows\Lively.scr"  # Ubicacin correcta
                 if (Test-Path $scrPath) {
                     Write-Log "PASO 5.5: Configurando Lively como protector de pantalla en backend..." "INFO"
                     $regPath = 'HKCU:\Control Panel\Desktop'
@@ -1238,14 +1238,14 @@ function DescargarFondosYProtectorDePantalla {
                     Set-ItemProperty -Path $regPath -Name 'ScreenSaveTimeOut' -Value '300' -Force
                     Set-ItemProperty -Path $regPath -Name 'ScreenSaveUsePassword' -Value '0' -Force
                     
-                    # Forzar actualización del sistema
+                    # Forzar actualizacin del sistema
                     rundll32.exe user32.dll, UpdatePerUserSystemParameters
                     Start-Sleep -Seconds 2
                     
                     Write-Log "PASO 5.5: Protector configurado en backend (5 minutos)." "INFO"
                 }
                 else {
-                    Write-Warning "PASO 5.5: No se encontró Lively.scr en la ruta esperada: $scrPath"
+                    Write-Warning "PASO 5.5: No se encontr Lively.scr en la ruta esperada: $scrPath"
                 }
             }
             catch {
@@ -1282,7 +1282,7 @@ function ValidarYConvertirVideoLively {
     
     Write-Log "Validando compatibilidad del video para Lively..." "INFO"
     
-    # Verificar si FFmpeg está instalado
+    # Verificar si FFmpeg est instalado
     $ffmpegPath = $null
     $ffmpegPaths = @(
         "ffmpeg.exe",
@@ -1300,14 +1300,14 @@ function ValidarYConvertirVideoLively {
         catch { }
     }
     
-    # Si FFmpeg no está, intentar instalarlo
+    # Si FFmpeg no est, intentar instalarlo
     if (-not $ffmpegPath) {
         Write-Log "FFmpeg no detectado. Intentando instalarlo con Winget..." "INFO"
         try {
             winget install --id Gyan.FFmpeg --silent --accept-source-agreements --accept-package-agreements --force 2>&1 | Out-Null
             Start-Sleep -Seconds 3
             
-            # Buscar FFmpeg nuevamente después de instalación (con refresh de PATH)
+            # Buscar FFmpeg nuevamente despus de instalacin (con refresh de PATH)
             $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
             
             # Intentar encontrar FFmpeg en ubicaciones comunes
@@ -1334,7 +1334,7 @@ function ValidarYConvertirVideoLively {
             }
         }
         catch {
-            Write-Log "No se pudo instalar FFmpeg automáticamente: $($_). Usando video original." "WARNING"
+            Write-Log "No se pudo instalar FFmpeg automticamente: $($_). Usando video original." "WARNING"
             return $videoPath
         }
     }
@@ -1352,9 +1352,9 @@ function ValidarYConvertirVideoLively {
     
     # Convertir video a formato compatible con Lively
     Write-Log "Convertiendo video a formato compatible (H.264, 1920x1080, 30fps, 8Mbps)..." "INFO"
-    Write-Log "Esto puede tomar algunos minutos según el tamaño del video..." "INFO"
+    Write-Log "Esto puede tomar algunos minutos segn el tamao del video..." "INFO"
     
-    # Argumentos de FFmpeg (con -hide_banner para suprimir información de versión)
+    # Argumentos de FFmpeg (con -hide_banner para suprimir informacin de versin)
     $ffmpegArgs = @(
         "-hide_banner",
         "-loglevel", "error",
@@ -1378,32 +1378,32 @@ function ValidarYConvertirVideoLively {
         # Ejecutar FFmpeg usando Start-Process para mejor control
         $processInfo = Start-Process -FilePath $ffmpegPath -ArgumentList $ffmpegArgs -NoNewWindow -Wait -PassThru -RedirectStandardError "$env:TEMP\ffmpeg_error.log" -RedirectStandardOutput "$env:TEMP\ffmpeg_output.log"
         
-        # Verificar código de salida
+        # Verificar cdigo de salida
         if ($processInfo.ExitCode -ne 0) {
-            Write-Log "FFmpeg terminó con código de error: $($processInfo.ExitCode)" "WARNING"
+            Write-Log "FFmpeg termin con cdigo de error: $($processInfo.ExitCode)" "WARNING"
             
-            # Leer últimas líneas del log de error
+            # Leer ltimas lneas del log de error
             if (Test-Path "$env:TEMP\ffmpeg_error.log") {
                 $errorContent = Get-Content "$env:TEMP\ffmpeg_error.log" -ErrorAction SilentlyContinue
                 if ($errorContent) {
-                    Write-Log "Últimas líneas de error FFmpeg:" "DEBUG"
+                    Write-Log "ltimas lneas de error FFmpeg:" "DEBUG"
                     $errorContent | Select-Object -Last 3 | ForEach-Object { Write-Log "  $_" "DEBUG" }
                 }
             }
             
-            Write-Log "Usando video original sin conversión." "INFO"
+            Write-Log "Usando video original sin conversin." "INFO"
             return $videoPath
         }
         
-        # Verificar si el archivo convertido existe y tiene contenido válido
+        # Verificar si el archivo convertido existe y tiene contenido vlido
         Start-Sleep -Seconds 1
         
         if (Test-Path $videoPathConverted -ErrorAction SilentlyContinue) {
             $convertedFileInfo = Get-Item $videoPathConverted
             
-            # Validar que el archivo tenga un tamaño razonable (al menos 100 KB)
+            # Validar que el archivo tenga un tamao razonable (al menos 100 KB)
             if ($convertedFileInfo.Length -lt 102400) {
-                Write-Log "Archivo convertido demasiado pequeño ($($convertedFileInfo.Length) bytes). Conversión falló." "WARNING"
+                Write-Log "Archivo convertido demasiado pequeo ($($convertedFileInfo.Length) bytes). Conversin fall." "WARNING"
                 Remove-Item $videoPathConverted -Force -ErrorAction SilentlyContinue
                 return $videoPath
             }
@@ -1416,7 +1416,7 @@ function ValidarYConvertirVideoLively {
             return $videoPathConverted
         }
         else {
-            Write-Log "FFmpeg completó pero archivo no se generó. Usando video original." "WARNING"
+            Write-Log "FFmpeg complet pero archivo no se gener. Usando video original." "WARNING"
             return $videoPath
         }
     }
@@ -1433,7 +1433,7 @@ function ValidarYConvertirVideoLively {
 
 # =================== Configura SOLO el protector de pantalla Lively ===================
 function ConfigurarLivelyProtectorYFondo {
-    Write-Log "Iniciando configuración SOLO del protector de pantalla Lively..." "INFO"
+    Write-Log "Iniciando configuracin SOLO del protector de pantalla Lively..." "INFO"
     try {
         # Buscar Lively ejecutable (v2.2.1.0)
         $livelyPaths = @(
@@ -1446,7 +1446,7 @@ function ConfigurarLivelyProtectorYFondo {
         $livelyExe = $livelyPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 
         if (-not $livelyExe) {
-            Write-Warning "No se encontró Lively instalado. Instálalo antes de continuar."
+            Write-Warning "No se encontr Lively instalado. Instlalo antes de continuar."
             return
         }
         
@@ -1456,29 +1456,29 @@ function ConfigurarLivelyProtectorYFondo {
         $videoPath = Join-Path ([Environment]::GetFolderPath("MyVideos")) "PROTECTOR-1.mp4"
         $videoPathConverted = Join-Path ([Environment]::GetFolderPath("MyVideos")) "PROTECTOR-1_compatible.mp4"
         $fondoPath = Join-Path ([Environment]::GetFolderPath("MyPictures")) "Fondos\Fondo de Escritorio.png"
-        $destScr = "C:\Windows\Lively.scr"  # Ubicación correcta del screensaver
+        $destScr = "C:\Windows\Lively.scr"  # Ubicacin correcta del screensaver
 
         # Paso 0.5: Validar y convertir video si es necesario
         Write-Log "Paso 0.5: Validando compatibilidad del video..." "INFO"
         $videoPathFinal = ValidarYConvertirVideoLively -videoPath $videoPath -videoPathConverted $videoPathConverted
         
-        # Validar que el video final exista y tenga tamaño válido
+        # Validar que el video final exista y tenga tamao vlido
         if (-not (Test-Path $videoPathFinal)) {
-            Write-Log "ERROR: No se encontró video en: $videoPathFinal" "ERROR"
-            Write-Log "Abortando configuración de Lively." "ERROR"
+            Write-Log "ERROR: No se encontr video en: $videoPathFinal" "ERROR"
+            Write-Log "Abortando configuracin de Lively." "ERROR"
             return
         }
         
         $videoInfo = Get-Item $videoPathFinal
         $videoSizeMB = [Math]::Round($videoInfo.Length / 1MB, 2)
-        Write-Log "Video final: $($videoInfo.Name) - Tamaño: $videoSizeMB MB" "INFO"
+        Write-Log "Video final: $($videoInfo.Name) - Tamao: $videoSizeMB MB" "INFO"
         
         if ($videoInfo.Length -lt 102400) {
-            Write-Log "ERROR: El video es demasiado pequeño ($($videoInfo.Length) bytes). Archivo corrupto." "ERROR"
+            Write-Log "ERROR: El video es demasiado pequeo ($($videoInfo.Length) bytes). Archivo corrupto." "ERROR"
             return
         }
 
-        # Paso 0: Establecer fondo de escritorio estático
+        # Paso 0: Establecer fondo de escritorio esttico
         if (Test-Path $fondoPath) {
             Write-Log "Aplicando fondo de escritorio fijo desde Windows..." "INFO"
             Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name wallpaper -Value $fondoPath
@@ -1486,12 +1486,12 @@ function ConfigurarLivelyProtectorYFondo {
             Write-Log "Fondo aplicado correctamente." "INFO"
         }
         else {
-            Write-Warning "No se encontró la imagen de fondo: $fondoPath"
+            Write-Warning "No se encontr la imagen de fondo: $fondoPath"
         }
 
         # Paso 1: Validar video
         if (-not (Test-Path $videoPathFinal)) {
-            Write-Warning "No se encontró el video del protector en: $videoPathFinal"
+            Write-Warning "No se encontr el video del protector en: $videoPathFinal"
             return
         }
 
@@ -1512,21 +1512,21 @@ function ConfigurarLivelyProtectorYFondo {
             Write-Log "Paso 2: Protector de pantalla configurado (5 minutos)." "INFO"
         }
         else {
-            Write-Warning "No se encontró Lively.scr en $destScr"
+            Write-Warning "No se encontr Lively.scr en $destScr"
             return
         }
 
-        # Paso 3: Configurar el video en Lively directamente en archivos de configuración
+        # Paso 3: Configurar el video en Lively directamente en archivos de configuracin
         Write-Log "Paso 3: Configurando video como screensaver en Lively..." "INFO"
         
         if (Test-Path $videoPathFinal) {
             try {
-                # Rutas de configuración de Lively
+                # Rutas de configuracin de Lively
                 $livelyDataPath = "$env:LOCALAPPDATA\Lively Wallpaper"
                 $settingsPath = Join-Path $livelyDataPath "Settings.json"
                 $libraryPath = Join-Path $livelyDataPath "Library\wallpapers"
                 
-                # Paso 3.0: Cerrar Lively completamente si está ejecutándose
+                # Paso 3.0: Cerrar Lively completamente si est ejecutndose
                 Write-Log "Paso 3.0: Cerrando Lively completamente..." "INFO"
                 Get-Process -Name "Lively*" -ErrorAction SilentlyContinue | ForEach-Object {
                     Write-Log "Paso 3.0: Deteniendo proceso: $($_.ProcessName) (PID: $($_.Id))" "DEBUG"
@@ -1534,17 +1534,17 @@ function ConfigurarLivelyProtectorYFondo {
                 }
                 Start-Sleep -Seconds 5
                 
-                # Verificar que Lively se cerró completamente
+                # Verificar que Lively se cerr completamente
                 $livelyStillRunning = Get-Process -Name "Lively*" -ErrorAction SilentlyContinue
                 if ($livelyStillRunning) {
-                    Write-Log "Paso 3.0: ADVERTENCIA - Lively sigue en ejecución, forzando cierre..." "WARNING"
+                    Write-Log "Paso 3.0: ADVERTENCIA - Lively sigue en ejecucin, forzando cierre..." "WARNING"
                     $livelyStillRunning | Stop-Process -Force -ErrorAction SilentlyContinue
                     Start-Sleep -Seconds 3
                 }
                 Write-Log "Paso 3.0: Lively cerrado completamente." "INFO"
                 
                 # Paso 3.1: Leer Settings.json existente (sin forzar cambios que bloqueen Lively)
-                Write-Log "Paso 3.1: Leyendo configuración actual de Lively..." "INFO"
+                Write-Log "Paso 3.1: Leyendo configuracin actual de Lively..." "INFO"
                 
                 # Crear carpeta de datos si no existe
                 if (-not (Test-Path $livelyDataPath)) {
@@ -1556,28 +1556,28 @@ function ConfigurarLivelyProtectorYFondo {
                     $settings = Get-Content -Path $settingsPath -Raw | ConvertFrom-Json
                     Write-Log "Paso 3.1: Settings.json cargado" "INFO"
                     
-                    # Configurar método de entrada a Teclado (InputForward: 0=Apagado, 1=Mouse, 2=Teclado)
+                    # Configurar mtodo de entrada a Teclado (InputForward: 0=Apagado, 1=Mouse, 2=Teclado)
                     if ($settings.PSObject.Properties.Name -contains "InputForward") {
                         if ($settings.InputForward -ne 2) {
                             $settings.InputForward = 2
-                            Write-Log "Paso 3.1: Método de entrada cambiado a Teclado" "INFO"
+                            Write-Log "Paso 3.1: Mtodo de entrada cambiado a Teclado" "INFO"
                             $cambiosEnSettings = $true
                         }
                     }
                     else {
                         $settings | Add-Member -MemberType NoteProperty -Name "InputForward" -Value 2 -Force
-                        Write-Log "Paso 3.1: Método de entrada configurado a Teclado" "INFO"
+                        Write-Log "Paso 3.1: Mtodo de entrada configurado a Teclado" "INFO"
                         $cambiosEnSettings = $true
                     }
                     
-                    # Guardar cambios si se modificó InputForward
+                    # Guardar cambios si se modific InputForward
                     if ($cambiosEnSettings) {
                         $settings | ConvertTo-Json -Depth 10 | Set-Content -Path $settingsPath -Encoding UTF8 -Force
-                        Write-Log "Paso 3.1: Configuración de entrada guardada" "INFO"
+                        Write-Log "Paso 3.1: Configuracin de entrada guardada" "INFO"
                     }
                 }
                 else {
-                    Write-Log "Paso 3.1: Settings.json no existe, Lively lo creará al iniciarse" "INFO"
+                    Write-Log "Paso 3.1: Settings.json no existe, Lively lo crear al iniciarse" "INFO"
                     $settings = $null
                 }
                 
@@ -1588,7 +1588,7 @@ function ConfigurarLivelyProtectorYFondo {
                     New-Item -ItemType Directory -Path $libraryPath -Force | Out-Null
                 }
                 
-                # Buscar y eliminar videos existentes con el mismo título
+                # Buscar y eliminar videos existentes con el mismo ttulo
                 Write-Log "Paso 3.2: Buscando wallpapers existentes con nombre 'Protector Vidanova'..." "DEBUG"
                 $wallpapersExistentes = Get-ChildItem -Path $libraryPath -Directory -ErrorAction SilentlyContinue | Where-Object {
                     $livelyInfoFile = Join-Path $_.FullName "LivelyInfo.json"
@@ -1617,13 +1617,13 @@ function ConfigurarLivelyProtectorYFondo {
                     }
                 }
                 
-                # Generar nombre único para la carpeta del nuevo wallpaper (SIN extensión .mp4)
+                # Generar nombre nico para la carpeta del nuevo wallpaper (SIN extensin .mp4)
                 $uniqueId = -join ((65..90) + (97..122) | Get-Random -Count 8 | ForEach-Object { [char]$_ })
                 $videoWallpaperFolder = Join-Path $libraryPath $uniqueId
                 New-Item -ItemType Directory -Path $videoWallpaperFolder -Force | Out-Null
                 Write-Log "Paso 3.2: Carpeta de wallpaper creada: $videoWallpaperFolder" "INFO"
                 
-                # Copiar el video a la biblioteca (usar versión convertida si está disponible)
+                # Copiar el video a la biblioteca (usar versin convertida si est disponible)
                 $videoDestInLibrary = Join-Path $videoWallpaperFolder "PROTECTOR-1.mp4"
                 Copy-Item -Path $videoPathFinal -Destination $videoDestInLibrary -Force
                 Write-Log "Paso 3.2: Video copiado a biblioteca: $videoWallpaperFolder" "INFO"
@@ -1649,9 +1649,9 @@ function ConfigurarLivelyProtectorYFondo {
                 $livelyInfo | ConvertTo-Json -Depth 5 | Set-Content -Path $livelyInfoPath -Encoding UTF8 -Force
                 Write-Log "Paso 3.2: LivelyInfo.json creado/actualizado correctamente" "INFO"
                 
-                # Verificar que el video sea válido antes de continuar
+                # Verificar que el video sea vlido antes de continuar
                 if (-not (Test-Path $videoDestInLibrary)) {
-                    Write-Log "Paso 3.2: ERROR - El video no se copió correctamente a la biblioteca." "ERROR"
+                    Write-Log "Paso 3.2: ERROR - El video no se copi correctamente a la biblioteca." "ERROR"
                     return
                 }
                 
@@ -1661,22 +1661,22 @@ function ConfigurarLivelyProtectorYFondo {
                 # Paso 3.3: Video agregado a la biblioteca, listo para que Lively lo detecte
                 Write-Log "Paso 3.3: Wallpaper agregado a biblioteca de Lively" "INFO"
                 Write-Log "Paso 3.3: Ruta: $videoWallpaperFolder" "INFO"
-                Write-Log "Paso 3.3: Lively detectará el video automáticamente al abrirse" "INFO"
+                Write-Log "Paso 3.3: Lively detectar el video automticamente al abrirse" "INFO"
                 
                 # Esperar un momento para que el sistema de archivos sincronice
                 Start-Sleep -Seconds 2
                 
                 Write-Log "Paso 3.4: Wallpaper listo en biblioteca de Lively" "INFO"
-                Write-Log "Paso 3.4: El video estará disponible cuando abras Lively" "INFO"
+                Write-Log "Paso 3.4: El video estar disponible cuando abras Lively" "INFO"
                 
-                Write-Log "Paso 3: Configuración completada exitosamente." "INFO"
+                Write-Log "Paso 3: Configuracin completada exitosamente." "INFO"
                 Write-Log "Paso 3: Video agregado a biblioteca de Lively" "INFO"
                 Write-Log "Paso 3: Ruta del wallpaper: $videoWallpaperFolder" "INFO"
                 Write-Log "Paso 3: IMPORTANTE: Abre Lively y configura manualmente:" "INFO"
                 Write-Log "Paso 3:   1. Haz clic derecho en 'Protector Vidanova' en la biblioteca" "INFO"
                 Write-Log "Paso 3:   2. Selecciona 'Establecer como protector de pantalla'" "INFO"
                 Write-Log "Paso 3:   3. Elige el modo que prefieras (Personalizado recomendado)" "INFO"
-                Write-Log "Paso 3: El protector de pantalla está configurado en Windows (C:\Windows\Lively.scr)" "INFO"
+                Write-Log "Paso 3: El protector de pantalla est configurado en Windows (C:\Windows\Lively.scr)" "INFO"
             }
             catch {
                 Write-Warning "Paso 3: Error configurando video: $($_)"
@@ -1687,28 +1687,28 @@ function ConfigurarLivelyProtectorYFondo {
         }
         
         # Paso 4: Lively ya debe estar abierto, no cerrar
-        Write-Log "Paso 4: Finalizando configuración..." "INFO"
-        Write-Log "Paso 4: Lively permanece abierto para mantener configuración activa." "INFO"
+        Write-Log "Paso 4: Finalizando configuracin..." "INFO"
+        Write-Log "Paso 4: Lively permanece abierto para mantener configuracin activa." "INFO"
 
-        Write-Log "Configuración de Lively completada: protector activo en modo Personalizado, fondo estático." "INFO"
-        Write-Log "IMPORTANTE: Lively quedará ejecutándose para mantener la configuración del screensaver." "INFO"
+        Write-Log "Configuracin de Lively completada: protector activo en modo Personalizado, fondo esttico." "INFO"
+        Write-Log "IMPORTANTE: Lively quedar ejecutndose para mantener la configuracin del screensaver." "INFO"
         Write-Log "" "INFO"
-        Write-Log "═══════════════════════════════════════════════════════════════════" "INFO"
-        Write-Log "CÓMO PROBAR EL PROTECTOR DE PANTALLA:" "INFO"
+        Write-Log "" "INFO"
+        Write-Log "CMO PROBAR EL PROTECTOR DE PANTALLA:" "INFO"
         Write-Log "  1. Presiona Win + L para bloquear la pantalla y espera 5 minutos" "INFO"
-        Write-Log "  2. O abre 'Configuración de pantalla de bloqueo' y haz clic en" "INFO"
-        Write-Log "     'Configuración del protector de pantalla' -> 'Vista previa'" "INFO"
+        Write-Log "  2. O abre 'Configuracin de pantalla de bloqueo' y haz clic en" "INFO"
+        Write-Log "     'Configuracin del protector de pantalla' -> 'Vista previa'" "INFO"
         Write-Log "  3. O ejecuta: $destScr /s" "INFO"
-        Write-Log "═══════════════════════════════════════════════════════════════════" "INFO"
+        Write-Log "" "INFO"
     }
     catch {
-        Write-Warning "Error en la configuración de Lively: $($_)"
+        Write-Warning "Error en la configuracin de Lively: $($_)"
     }
 }
 
-# =================== Función de Configuración de Barra de Tareas Windows 11 =====================
+# =================== Funcin de Configuracin de Barra de Tareas Windows 11 =====================
 function ConfigurarBarraTareasWindows11 {
-    Write-Log "Verificando versión de Windows..." "INFO"
+    Write-Log "Verificando versin de Windows..." "INFO"
     
     try {
         # Detectar si es Windows 11
@@ -1716,7 +1716,7 @@ function ConfigurarBarraTareasWindows11 {
         $buildNumber = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -Name CurrentBuild).CurrentBuild
         
         if ([int]$buildNumber -lt 22000) {
-            Write-Log "Este sistema es Windows 10 (Build: $buildNumber). Configuración solo para Windows 11." "INFO"
+            Write-Log "Este sistema es Windows 10 (Build: $buildNumber). Configuracin solo para Windows 11." "INFO"
             return
         }
         
@@ -1755,28 +1755,28 @@ function ConfigurarBarraTareasWindows11 {
         try {
             $valorActual = Get-ItemProperty -Path $regPathExplorer -Name "TaskbarAl" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty TaskbarAl
             if ($valorActual -ne 0) {
-                Write-Log "→ Alineando iconos a la izquierda..." "INFO"
+                Write-Log " Alineando iconos a la izquierda..." "INFO"
                 New-ItemProperty -Path $regPathExplorer -Name "TaskbarAl" -Value 0 -PropertyType DWord -Force -ErrorAction Stop
                 $cambiosAplicados = $true
             }
             else {
-                Write-Log "→ Iconos ya están alineados a la izquierda (valor actual: $valorActual)" "INFO"
+                Write-Log " Iconos ya estn alineados a la izquierda (valor actual: $valorActual)" "INFO"
             }
         }
         catch {
-            Write-Warning "Error al configurar alineación de iconos: $($_)"
+            Write-Warning "Error al configurar alineacin de iconos: $($_)"
         }
         
         # 2. Ocultar vista de tareas (Task View)
         try {
             $valorActual = Get-ItemProperty -Path $regPathExplorer -Name "ShowTaskViewButton" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ShowTaskViewButton
             if ($valorActual -ne 0) {
-                Write-Log "→ Ocultando Vista de Tareas..." "INFO"
+                Write-Log " Ocultando Vista de Tareas..." "INFO"
                 New-ItemProperty -Path $regPathExplorer -Name "ShowTaskViewButton" -Value 0 -PropertyType DWord -Force -ErrorAction Stop
                 $cambiosAplicados = $true
             }
             else {
-                Write-Log "→ Vista de Tareas ya está oculta (valor actual: $valorActual)" "INFO"
+                Write-Log " Vista de Tareas ya est oculta (valor actual: $valorActual)" "INFO"
             }
         }
         catch {
@@ -1787,12 +1787,12 @@ function ConfigurarBarraTareasWindows11 {
         try {
             $valorActual = Get-ItemProperty -Path $regPathExplorer -Name "TaskbarDa" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty TaskbarDa
             if ($valorActual -ne 0) {
-                Write-Log "→ Deshabilitando completamente Widgets..." "INFO"
+                Write-Log " Deshabilitando completamente Widgets..." "INFO"
                 
-                # 3a) Ocultar botón en taskbar
+                # 3a) Ocultar botn en taskbar
                 New-ItemProperty -Path $regPathExplorer -Name "TaskbarDa" -Value 0 -PropertyType DWord -Force -ErrorAction Stop
                 
-                # 3b) Aplicar política de grupo
+                # 3b) Aplicar poltica de grupo
                 New-ItemProperty -Path $regPolicyWidgets -Name "AllowWidgets" -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
                 
                 # 3c) Desactivar feeds
@@ -1804,36 +1804,36 @@ function ConfigurarBarraTareasWindows11 {
                 try {
                     Stop-Service -Name 'WidgetService' -Force -ErrorAction SilentlyContinue
                     Set-Service -Name 'WidgetService' -StartupType Disabled -ErrorAction SilentlyContinue
-                    Write-Log "→ Servicio WidgetService deshabilitado." "DEBUG"
+                    Write-Log " Servicio WidgetService deshabilitado." "DEBUG"
                 }
                 catch {
-                    Write-Log "→ WidgetService no disponible en esta build." "DEBUG"
+                    Write-Log " WidgetService no disponible en esta build." "DEBUG"
                 }
                 
                 $cambiosAplicados = $true
             }
             else {
-                Write-Log "→ Widgets ya están deshabilitados (valor actual: $valorActual)" "INFO"
+                Write-Log " Widgets ya estn deshabilitados (valor actual: $valorActual)" "INFO"
             }
         }
         catch {
             Write-Warning "Error al configurar Widgets: $($_)"
         }
         
-        # 4. Configurar búsqueda solo como icono
+        # 4. Configurar bsqueda solo como icono
         try {
             $valorActual = Get-ItemProperty -Path $regPathSearch -Name "SearchboxTaskbarMode" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty SearchboxTaskbarMode
             if ($valorActual -ne 1) {
-                Write-Log "→ Configurando búsqueda solo como icono..." "INFO"
+                Write-Log " Configurando bsqueda solo como icono..." "INFO"
                 New-ItemProperty -Path $regPathSearch -Name "SearchboxTaskbarMode" -Value 1 -PropertyType DWord -Force -ErrorAction Stop
                 $cambiosAplicados = $true
             }
             else {
-                Write-Log "→ Búsqueda ya está configurada como icono (valor actual: $valorActual)" "INFO"
+                Write-Log " Bsqueda ya est configurada como icono (valor actual: $valorActual)" "INFO"
             }
         }
         catch {
-            Write-Warning "Error al configurar búsqueda: $($_)"
+            Write-Warning "Error al configurar bsqueda: $($_)"
         }
 
         # 5. Ocultar boton Copilot si existe
@@ -1848,15 +1848,15 @@ function ConfigurarBarraTareasWindows11 {
             Write-Log "No se pudo ocultar Copilot automaticamente: $($_)" "WARNING"
         }
         
-        # 5. Reiniciar Explorador y forzar actualización de configuración
-        Write-Log "Aplicando cambios de configuraciónreiniciando Explorer" "INFO"
+        # 5. Reiniciar Explorador y forzar actualizacin de configuracin
+        Write-Log "Aplicando cambios de configuracinreiniciando Explorer" "INFO"
         try {
             # Matar explorer y procesos widget
             Get-Process -Name explorer -ErrorAction SilentlyContinue | Stop-Process -Force
             Get-Process -Name "Widget*" -ErrorAction SilentlyContinue | Stop-Process -Force
             Start-Sleep -Seconds 3
             
-            # Forzar actualización del sistema
+            # Forzar actualizacin del sistema
             try {
                 rundll32.exe user32.dll, UpdatePerUserSystemParameters -ErrorAction SilentlyContinue
             }
@@ -1866,11 +1866,11 @@ function ConfigurarBarraTareasWindows11 {
             Start-Process explorer.exe
             Start-Sleep -Seconds 3
             
-            Write-Log " Configuración de barra de tareas aplicada exitosamente." "INFO"
-            Write-Log " Si Widgets aún persisten, cierra sesión y vuelve a iniciar para aplicar cambios de política completos." "INFO"
+            Write-Log " Configuracin de barra de tareas aplicada exitosamente." "INFO"
+            Write-Log " Si Widgets an persisten, cierra sesin y vuelve a iniciar para aplicar cambios de poltica completos." "INFO"
         }
         catch {
-            Write-Warning "No se pudo reiniciar Explorer automáticamente. Reinicia manualmente si es necesario."
+            Write-Warning "No se pudo reiniciar Explorer automticamente. Reinicia manualmente si es necesario."
         }
     }
     catch {
@@ -2009,7 +2009,7 @@ function GestionarAnclajeBarraTareas {
                 }
                 else {
                     if ($entry.nombre -eq "Spotify") {
-                        Write-Log "  - No se encontro: $($entry.nombre) (puede no estar instalado aún o ser instalado por Microsoft Store)" "DEBUG"
+                        Write-Log "  - No se encontro: $($entry.nombre) (puede no estar instalado an o ser instalado por Microsoft Store)" "DEBUG"
                     }
                     else {
                         Write-Log "  - No se encontro: $($entry.nombre)" "DEBUG"
@@ -2056,14 +2056,14 @@ catch {
     Write-Log "Error critico: $($_)" "ERROR"
 }
 finally {
-    # Cerrar Explorador de Archivos si está abierto
-    Write-Log "Cerrando Explorador de Archivos si está abierto..." "INFO"
+    # Cerrar Explorador de Archivos si est abierto
+    Write-Log "Cerrando Explorador de Archivos si est abierto..." "INFO"
     try {
         Get-Process -Name explorer -ErrorAction SilentlyContinue | Stop-Process -Force
         Start-Sleep -Seconds 1
     }
     catch {
-        Write-Log "No había Explorador abierto o ya estaba cerrado." "DEBUG"
+        Write-Log "No haba Explorador abierto o ya estaba cerrado." "DEBUG"
     }
     
     Read-Host "Mantenimiento completado o detenido. Presione ENTER para salir"
