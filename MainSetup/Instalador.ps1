@@ -291,7 +291,7 @@ function InstalarSoporteFabricante {
     }
 
     if ($fab -eq "Desconocido" -or !$urls.ContainsKey($fab)) {
-        Write-Warning "Fabricante no reconocido. Se usar SDI Lite como solucion de respaldo." "WARNING"
+        Write-Log "Fabricante no reconocido. Se usar SDI Lite como solucion de respaldo." "WARNING"
         UsarSDILite
         return
     }
